@@ -135,3 +135,14 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# ===== Python TokenURL 服务 (server/) =====
+# 运行时产物：虚拟环境、字节码、日志
+server/.venv/
+server/__pycache__/
+server/*.pyc
+# 敏感数据：config.json 内含用户令牌（可直接换取游戏 token）与密码哈希
+server/config.json
+server/.secret_key
+# 运行时上传目录
+server/bin/
