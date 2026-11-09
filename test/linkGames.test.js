@@ -353,6 +353,7 @@ test("assistant transport cannot open or reconnect while an online game owns the
       "./bonProtocol.js": { g_utils: {} },
       "./helperTaskRunner.js": { sleep: async () => {} },
       "./logger.js": { gameLogger: logger, wsLogger: logger },
+      "./bgTicker.js": { onBgTick: () => () => {} },
     },
     {
       WebSocket: class {
