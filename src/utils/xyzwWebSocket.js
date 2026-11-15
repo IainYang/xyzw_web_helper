@@ -404,6 +404,55 @@ export function registerDefaultCommands(reg) {
 
     // 咸王宝库
     .register("matchteam_getroleteaminfo")
+    // 十殿试炼（NightMare）组队 —— 命令与字段来自 2026-11-10 实机抓包确认
+    .register("matchteam_create", {
+      teamCfgId: 1,
+      setting: {
+        name: "",
+        notice: "",
+        secret: 1,
+        apply: 0,
+        applyList: [],
+        star: 0,
+      },
+      param: 0,
+      custom: {},
+      extParam: 0,
+    })
+    .register("matchteam_join", { teamId: "" })
+    .register("matchteam_memberprepare", { teamId: "" })
+    .register("matchteam_getteaminfo", { teamId: "" })
+    .register("matchteam_dismiss", { teamId: "" })
+    // 十殿开团：队长进入房间（房间号由 nightmare_roominfo_notify 推送，不在返回值里）
+    .register("matchteam_openteam", { teamId: "" })
+    // 十殿战斗：指定上场者 / 发起战斗（服务端模拟，请求体只有 roomId + roleId）/ 队长确认本层完成
+    .register("nightmare_setfighter", { roomId: "", roleId: 0 })
+    .register("nightmare_fight", { roomId: "", roleId: 0 })
+    .register("nightmare_leadercomplete", { roomId: "" })
+    // 房间全量快照：客户端进房间（含从战斗返回）时发，返回 roomInfo（含 boss curMonsterData）
+    .register("nightmare_getroominfo", { roomId: "" })
+    // 恢复（阵亡武将回满）：队长可替队员发，body = { roomId, roleId: 被恢复的人 }
+    .register("nightmare_restore", { roomId: "", roleId: 0 })
+    .register("nightmare_roominfo_notify")
+    .register("nightmare_fightnotify")
+    .register("matchteam_getrandteamlist")
+    // 建队前置：为组队玩法（teamType=3）设置上阵阵容，游戏客户端建队前必发
+    .register("team_setteam", {
+      teamType: 3,
+      battleTeam: {},
+      lordWeaponId: 0,
+      petUId: "",
+      cCMonsterId: 0,
+    })
+    // 建队前置：按当前阵容算战力，游戏在 team_setteam 之前先发这条
+    .register("hero_calcpowerbyteam", {
+      battleTeam: {},
+      lordWeaponId: 0,
+      petUId: "",
+    })
+    .register("matchteam_notify")
+    .register("queue_getinfo")
+    .register("nmext_getinfo")
     .register("bosstower_getinfo")
     .register("bosstower_startboss")
     .register("bosstower_startbox")
@@ -1090,6 +1139,46 @@ export class XyzwWebSocketClient {
 
         // 编码并发送
         const bin = this.registry.encodePacket(raw);
+
+        // 调试埋点：把本客户端发出的组队命令原始帧也录进前端埋点日志，
+        // 便于和游戏页抓到的同一命令做字节级对比（仅开发环境）
+        if (
+          import.meta.env?.DEV &&
+          /^matchteam_|^team_setteam$/.test(raw.cmd)
+        ) {
+          try {
+            const bytes = new Uint8Array(bin);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+              binary += String.fromCharCode.apply(
+                null,
+                bytes.subarray(i, i + 0x8000),
+              );
+            }
+            fetch("/frontend-log", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                logs: [
+                  {
+                    ts: new Date().toISOString(),
+                    level: "debug",
+                    message: `helper-ws:${raw.cmd}`,
+                    page: "/helper-ws",
+                    meta: {
+                      dir: "out",
+                      kind: "bin",
+                      b64: btoa(binary),
+                      ws: "helper",
+                    },
+                  },
+                ],
+              }),
+            }).catch(() => {});
+          } catch {
+            // 忽略埋点失败
+          }
+        }
         if (
           this.socket !== socket ||
           !this.connected ||
@@ -1178,11 +1267,19 @@ export class XyzwWebSocketClient {
       } else {
         // 获取错误描述
         const errorDesc =
-          errorCodeMap[packet.code] || packet.hint || "未知错误";
+          errorCodeMap[packet.code] ||
+          packet.hint ||
+          packet.error ||
+          "未知错误";
 
-        promiseData.reject(
-          new Error(`服务器错误: ${packet.code} - ${errorDesc}`),
-        );
+        const err = new Error(`服务器错误: ${packet.code} - ${errorDesc}`);
+        // 把原始错误包挂出来，便于离线看服务端到底回了什么（hint/params/body）
+        err.code = packet.code;
+        err.cmd = promiseData.originalCmd;
+        err.hint = packet.hint;
+        err.rawPacket = packet;
+        err.rawBody = responseBody;
+        promiseData.reject(err);
       }
       return;
     }
@@ -1275,6 +1372,22 @@ export class XyzwWebSocketClient {
       pearl_unloadskillresp: "pearl_unloadskill",
       // 咸王宝库
       matchteam_getroleteaminforesp: "matchteam_getroleteaminfo",
+      // 十殿试炼组队
+      matchteam_createresp: "matchteam_create",
+      matchteam_joinresp: "matchteam_join",
+      matchteam_memberprepareresp: "matchteam_memberprepare",
+      matchteam_getteaminforesp: "matchteam_getteaminfo",
+      matchteam_dismissresp: "matchteam_dismiss",
+      matchteam_getrandteamlistresp: "matchteam_getrandteamlist",
+      hero_calcpowerbyteamresp: "hero_calcpowerbyteam",
+      matchteam_openteamresp: "matchteam_openteam",
+      nightmare_setfighterresp: "nightmare_setfighter",
+      nightmare_fightresp: "nightmare_fight",
+      nightmare_leadercompleteresp: "nightmare_leadercomplete",
+      nightmare_getroominforesp: "nightmare_getroominfo",
+      nightmare_restoreresp: "nightmare_restore",
+      queue_getinforesp: "queue_getinfo",
+      nmext_getinforesp: "nmext_getinfo",
       bosstower_getinforesp: "bosstower_getinfo",
       bosstower_startbossresp: "bosstower_startboss",
       bosstower_startboxresp: "bosstower_startbox",
@@ -1384,11 +1497,18 @@ export class XyzwWebSocketClient {
         } else {
           // 获取错误描述
           const errorDesc =
-            errorCodeMap[packet.code] || packet.hint || "未知错误";
+            errorCodeMap[packet.code] ||
+            packet.hint ||
+            packet.error ||
+            "未知错误";
 
-          promiseData.reject(
-            new Error(`服务器错误: ${packet.code} - ${errorDesc}`),
-          );
+          const err = new Error(`服务器错误: ${packet.code} - ${errorDesc}`);
+          err.code = packet.code;
+          err.cmd = promiseData.originalCmd;
+          err.hint = packet.hint;
+          err.rawPacket = packet;
+          err.rawBody = responseBody;
+          promiseData.reject(err);
         }
         break;
       }
