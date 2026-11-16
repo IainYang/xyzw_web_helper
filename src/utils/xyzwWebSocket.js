@@ -557,6 +557,8 @@ export class XyzwWebSocketClient {
     this.showMsg = false;
     this.connected = false;
     this.isReconnecting = false; // 重连状态标志
+    /** 连续重连次数，用于指数退避（连上成功即清零） */
+    this.reconnectAttempts = 0;
 
     this.promises = Object.create(null);
     this.registry = registerDefaultCommands(
@@ -591,6 +593,8 @@ export class XyzwWebSocketClient {
       if (this.socket !== socket) return;
       wsLogger.info("连接成功");
       this.connected = true;
+      // 连上就清零，下次断开重新从 1 秒起步
+      this.reconnectAttempts = 0;
       // 启动心跳机制
       this._setupHeartbeat();
       // 启动消息队列处理
@@ -893,7 +897,15 @@ export class XyzwWebSocketClient {
     this.disconnect();
     this.isReconnecting = true;
 
-    // 延迟重连，避免过于频繁
+    // 指数退避：1s → 2s → 4s → 8s → 16s → 32s → 60s（上限）
+    // 服务端拒绝/风控时，固定 1 秒重试会变成「疯狂敲门」，反而拖长恢复时间
+    const attempt = this.reconnectAttempts || 0;
+    const delay = Math.min(1000 * 2 ** attempt, 60000);
+    this.reconnectAttempts = attempt + 1;
+    if (attempt > 0) {
+      wsLogger.warn(`第 ${attempt + 1} 次重连，${delay}ms 后重试`);
+    }
+
     const reconnectTimer = setTimeout(() => {
       if (this.reconnectTimer !== reconnectTimer) return;
       this.reconnectTimer = null;
@@ -908,7 +920,7 @@ export class XyzwWebSocketClient {
         }, 2000); // 2秒后允许下次重连
         this.reconnectResetTimer = resetTimer;
       }
-    }, 1000);
+    }, delay);
     this.reconnectTimer = reconnectTimer;
   }
 
