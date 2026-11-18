@@ -343,6 +343,10 @@ export function registerDefaultCommands(reg) {
     .register("dungeon_buymerchant")
     // 活动/任务
     .register("activity_get")
+    // 赛事（PK 房间）预约：查询当前赛事 / 详情 / 预约（预约请求体为空，服务端按当前赛事处理）
+    .register("pkroom_getfightroominfo")
+    .register("pkroom_getfightroomdetail", { roomId: "" })
+    .register("pkroom_appoint")
     .register("activity_recyclewarorderrewardclaim")
     // 玄武赐福活动
     .register("activity_warorderget")
@@ -476,12 +480,14 @@ export function registerDefaultCommands(reg) {
 
     // 逐鹿盐山竞猜
     .register("apex_getroleinfo")
+    .register("apex_taskclaim", { confId: 0 })
     .register("apex_getguesslist", { scheduleId: 0, idx: 0 })
     .register("apex_guess", { teamId: "" })
     .register("apex_get64oppomap", { scheduleId: 0, groupId: 0 })
     // —— APEX 逐鹿盐山：按需注册，仅登记组件实际调用的命令 ——
-    .register("apex_getvotelist")
-    .register("apex_vote", { round: 0, teamId: "" });
+    // 助威：groupId=第几组（界面「第1组」），round=赛期，voteCnt=投入票数
+    .register("apex_getvotelist", { groupId: 0, idx: 0, round: 0 })
+    .register("apex_vote", { round: 0, teamId: "", voteCnt: 0 });
   registry.commands.set(
     "fight_startareaarena",
     (ack = 0, seq = 0, params = {}) => {
@@ -1307,6 +1313,9 @@ export class XyzwWebSocketClient {
       // 1:1 响应映射（优先级高）
       fight_startpvpresp: "fight_startpvp",
       activity_getresp: "activity_get",
+      pkroom_getfightroominforesp: "pkroom_getfightroominfo",
+      pkroom_getfightroomdetailresp: "pkroom_getfightroomdetail",
+      pkroom_appointresp: "pkroom_appoint",
       collection_goodslistresp: "collection_goodslist",
       collection_claimfreerewardresp: "collection_claimfreereward",
       legion_getarearankresp: "legion_getarearank",
@@ -1318,6 +1327,7 @@ export class XyzwWebSocketClient {
       studyresp: "study_startgame",
       role_getroleinforesp: "role_getroleinfo",
       apex_getroleinforesp: "apex_getroleinfo",
+      apex_taskclaimresp: "apex_taskclaim",
       apex_getguesslistresp: "apex_getguesslist",
       apex_guessresp: "apex_guess",
       apex_get64oppomapresp: "apex_get64oppomap",

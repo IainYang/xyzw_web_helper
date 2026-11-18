@@ -44,7 +44,7 @@
       </div>
       <div class="actions">
         <n-button type="primary" :loading="running" @click="runAll()"
-          >一键组队（建队 → 加入 → 准备）</n-button
+          >一键组队（自动校正 → 准备）</n-button
         >
         <n-button :loading="connecting" @click="connectSelected()"
           >连接勾选账号</n-button
@@ -84,7 +84,9 @@
           :loading="!!fightingRoleId"
           :disabled="running || !room.roomId || cdLeft > 0"
           @click="fightDefault()"
-          >{{ cdLeft > 0 ? `冷却中 ${cdLeft}s` : "开战（勾选的第一个）" }}</n-button
+          >{{
+            cdLeft > 0 ? `冷却中 ${cdLeft}s` : "开战（勾选的第一个）"
+          }}</n-button
         >
         <n-button
           type="error"
@@ -124,7 +126,8 @@
         <span>{{ room.curMonsterCfgId ?? "—" }}</span>
         <span class="label">state</span>
         <span
-          >{{ room.state ?? "—" }}<template v-if="room.state === 1"
+          >{{ room.state ?? "—"
+          }}<template v-if="room.state === 1"
             >（播放中<template v-if="stateLeft > 0"
               >，剩 {{ stateLeft }}s</template
             >）</template
@@ -145,8 +148,8 @@
         <span>{{ roomUpdatedText }}</span>
         <span class="label">数据来源</span>
         <span
-          >助手推送 {{ roomPushCount }} 帧 / 日志重放 {{ replayFrames }}
-          帧</span
+          >助手推送 {{ roomPushCount }} 帧 / 日志重放
+          {{ replayFrames }} 帧</span
         >
       </div>
     </section>
@@ -164,7 +167,8 @@
       <div class="boss-meta">
         <span>战力 {{ fmtPower(currentBoss.power) }}</span>
         <span v-if="currentBoss.hp !== null">
-          剩余 {{ fmtHp(currentBoss.hp) }}<template v-if="currentBoss.maxHp"
+          剩余 {{ fmtHp(currentBoss.hp)
+          }}<template v-if="currentBoss.maxHp"
             >/ {{ fmtHp(currentBoss.maxHp) }}</template
           >
         </span>
@@ -214,9 +218,7 @@
           <span class="layer-hp">
             <template v-if="layer.hp !== null">
               剩余 {{ fmtHp(layer.hp) }}
-              <template v-if="layer.maxHp"
-                >/ {{ fmtHp(layer.maxHp) }}</template
-              >
+              <template v-if="layer.maxHp">/ {{ fmtHp(layer.maxHp) }}</template>
             </template>
             <template v-else>未开打</template>
           </span>
@@ -236,7 +238,9 @@
             >存活 {{ member.alive }}/{{ member.total }}</span
           >
           <span v-if="member.totalMaxHp" class="member-hp">
-            总血 {{ fmtPower(member.totalHp) }}/{{ fmtPower(member.totalMaxHp) }}
+            总血 {{ fmtPower(member.totalHp) }}/{{
+              fmtPower(member.totalMaxHp)
+            }}
             <span class="member-bar"
               ><i :style="{ width: `${member.hpPct}%` }"
             /></span>
@@ -253,7 +257,9 @@
             /></span>
             <span class="hc-hp">
               {{ fmtPower(hero.hp)
-              }}<template v-if="hero.maxHp">/{{ fmtPower(hero.maxHp) }}</template>
+              }}<template v-if="hero.maxHp"
+                >/{{ fmtPower(hero.maxHp) }}</template
+              >
             </span>
             <em>{{
               hero.hp <= 0
@@ -287,9 +293,8 @@
               >{{ battle.round }}/{{ battle.maxRound }} 回合 · 全队
               {{ fmtHp(battle.total) }} ·
               <template v-if="battle.bossLeft !== null"
-                >boss 剩 {{ fmtHp(battle.bossLeft) }}{{
-                  battle.bossLeftFromRoom ? "（当前）" : ""
-                }}</template
+                >boss 剩 {{ fmtHp(battle.bossLeft)
+                }}{{ battle.bossLeftFromRoom ? "（当前）" : "" }}</template
               >
               <template v-else
                 >boss 本场承伤
@@ -422,7 +427,9 @@
               :disabled="!!fightingRoleId || !!restoringRoleId || !room.roomId"
               @click.stop="restoreMember(member)"
             >
-              {{ restoringRoleId === member.roleId ? "恢复中…" : "恢复（回满）" }}
+              {{
+                restoringRoleId === member.roleId ? "恢复中…" : "恢复（回满）"
+              }}
             </n-button>
             <span v-if="member.source === 'battleData'" class="foot-hint"
               >阵容来自队伍数据</span
@@ -438,7 +445,7 @@
         <div
           v-for="(log, index) in logs"
           :key="index"
-          :class="['log', log.type]"
+          class="log" :class="[log.type]"
         >
           <span class="time">{{ log.time }}</span>
           <span class="who">{{ log.who }}</span>
@@ -498,12 +505,12 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, reactive, ref, watch } from "vue";
 import { useMessage } from "naive-ui";
-import { useTokenStore } from "@/stores/tokenStore";
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from "vue";
 import { onSome } from "@/stores/events";
-import { HERO_DICT } from "@/utils/HeroList";
+import { useTokenStore } from "@/stores/tokenStore";
 import { g_utils } from "@/utils/bonProtocol";
+import { HERO_DICT } from "@/utils/HeroList";
 import { BOSS_POS_LABEL, getBossOfLayer } from "@/utils/nightmareBosses";
 
 const tokenStore = useTokenStore();
@@ -610,7 +617,8 @@ function pushBattle(data, ts, { live = true } = {}) {
   const bossUnits = acceptUnits.map((hero) => {
     const id = Number(hero.heroId);
     const taken = Number(hero.takeDamage) || 0;
-    let before = snap?.units?.[String(id)] ?? (live ? bossUnitHp(layer, id) : null);
+    let before =
+      snap?.units?.[String(id)] ?? (live ? bossUnitHp(layer, id) : null);
     // 0 往往是"未交战占位"，不是真血量
     if (before === 0 && taken > 0) before = null;
     return {
@@ -621,9 +629,10 @@ function pushBattle(data, ts, { live = true } = {}) {
     };
   });
   const bossDamage = bossUnits.reduce((sum, unit) => sum + unit.taken, 0);
-  const bossLeft = bossUnits.length && bossUnits.every((u) => u.hp !== null)
-    ? bossUnits.reduce((sum, unit) => sum + unit.hp, 0)
-    : null;
+  const bossLeft =
+    bossUnits.length && bossUnits.every((u) => u.hp !== null)
+      ? bossUnits.reduce((sum, unit) => sum + unit.hp, 0)
+      : null;
   team.sort((a, b) => b.damage - a.damage);
 
   battles.value.unshift({
@@ -679,13 +688,6 @@ function memberOnline(member) {
   return Boolean(tokenId && isConnected(tokenId));
 }
 
-/** 某角色在房间里还活着几个武将（数据来自 playerTeamInfo.curHeroData） */
-function aliveOf(roleId) {
-  const heroes = room.playerTeamInfo?.[roleId]?.curHeroData;
-  if (!heroes) return null;
-  return Object.values(heroes).filter((h) => Number(h.curHp) > 0).length;
-}
-
 /**
  * 某层 boss 剩余总血量。
  *
@@ -697,7 +699,10 @@ function bossHpOf(layer) {
   const data = info?.curMonsterData;
   const list = data ? Object.values(data) : [];
   if (!list.length) return null;
-  const sum = list.reduce((total, unit) => total + (Number(unit.curHp) || 0), 0);
+  const sum = list.reduce(
+    (total, unit) => total + (Number(unit.curHp) || 0),
+    0,
+  );
   // 未交战的层是全 0 占位；打过的层 0 才是真的清空
   if (!sum && !(Number(info?.totalAttacked) > 0)) return null;
   return sum;
@@ -860,13 +865,43 @@ async function openTeam() {
     if (!result.ok) return;
     addLog(getName(sender), "开团指令已发出，等待房间推送…", "success");
 
-    // 房间号只通过 roominfo 推送，助手连接可能收不到，直接重放游戏页的帧
+    // 队长要马上写进 room：后续 setfighter 靠它决定由谁发，
+    // 只等房间帧的话，帧不全时 leaderId 会是 0 → 队员代发 → 服务端判无权限
+    if (leaderId) room.leaderId = leaderId;
+    room.matchTeamId = target;
+
+    // 房间号只通过 roominfo 推送，助手连接可能收不到，先从游戏页帧重放
     await sleep(2500);
     await replayRoomFromHistory();
+
+    // 重放没拿到房间号就主动问一遍 nightmare_getroleinfo，再取 getroominfo 全量
+    if (!room.roomId) {
+      for (const tokenId of online) {
+        const rid = await getRoleId(tokenId);
+        if (!rid) continue;
+        const info = await send(tokenId, "nightmare_getroleinfo", {
+          roleId: rid,
+        });
+        const data = info.body?.nightMareData || {};
+        if (data.roomId) {
+          room.roomId = String(data.roomId);
+          addLog("系统", `roleinfo 显示房间 ${data.roomId}`, "info");
+          break;
+        }
+        await sleep(120);
+      }
+    }
+
     if (room.roomId) {
+      const snapshot = await fetchRoomInfo(sender, room.roomId);
+      if (snapshot) {
+        applyRoomLineup(snapshot);
+        if (!room.leaderId)
+          room.leaderId = Number(snapshot.leaderId || 0) || room.leaderId;
+      }
       addLog(
         "系统",
-        `房间 ${room.roomId} 已就绪，当前第 ${room.curMonsterCfgId ?? "?"} 层，可以选人开战了`,
+        `房间 ${room.roomId} 已就绪，当前第 ${room.curMonsterCfgId ?? "?"} 层｜队长 ${room.leaderId ?? "?"}，可以选人开战了`,
         "success",
       );
     } else {
@@ -961,7 +996,8 @@ function syncRoomClock(info) {
 
 /** 队长发 leadercomplete（游戏里是播放完才发，这里可以提前） */
 async function fireLeaderComplete(roomId, fallbackToken, tag = "") {
-  const leaderToken = await findTokenOfRole(Number(room.leaderId || 0));
+  const leaderId = await ensureLeaderId();
+  const leaderToken = leaderId ? await resolveTokenOfRole(leaderId) : "";
   const by =
     leaderToken && isConnected(leaderToken) ? leaderToken : fallbackToken;
   if (!by) {
@@ -1038,7 +1074,11 @@ async function sendLeaderComplete() {
   await sleep(600);
   const info = await syncRoomQuiet();
   if (!info) setCdAfter(FIGHT_INTERVAL_MS);
-  addLog("系统", `手动 leadercomplete 后刷新：CD 剩余 ${cdLeft.value}s`, "info");
+  addLog(
+    "系统",
+    `手动 leadercomplete 后刷新：CD 剩余 ${cdLeft.value}s`,
+    "info",
+  );
 }
 
 /**
@@ -1093,7 +1133,9 @@ async function findTokenOfRole(roleId) {
   // 勾选过的优先，再扫其余已连接账号
   const order = [
     ...selected.value,
-    ...tokens.value.map((item) => item.id).filter((id) => !selected.value.includes(id)),
+    ...tokens.value
+      .map((item) => item.id)
+      .filter((id) => !selected.value.includes(id)),
   ];
   for (const tokenId of order) {
     if (!isConnected(tokenId)) continue;
@@ -1153,10 +1195,10 @@ async function fightWith(member) {
     return;
   }
 
-  // 队长有权指定并由队长连接代发 fight（不需要被指定人自己的连接）；
-  // 本人连接在的话优先用本人的，出问题时更好对日志。
-  const leaderId = Number(room.leaderId || 0);
-  const leaderToken = leaderId ? await findTokenOfRole(leaderId) : "";
+  // setfighter 必须由队长连接发（缺失会被判「无权限」）；
+  // fight 用本人的连接更稳，本人没连才退回队长连接代发。
+  const leaderId = await ensureLeaderId();
+  const leaderToken = leaderId ? await resolveTokenOfRole(leaderId) : "";
   const ownToken = await findTokenOfRole(roleId);
   const sender = ownToken || leaderToken;
   if (!sender) {
@@ -1171,6 +1213,14 @@ async function fightWith(member) {
     return;
   }
   if (!(await ensureConnected(sender))) return;
+
+  if (!leaderToken) {
+    addLog(
+      "系统",
+      `没拿到队长连接（leaderId=${leaderId || "未知"}），setfighter 将由 ${getName(sender)} 代发，服务端可能回「无权限」`,
+      "warning",
+    );
+  }
 
   const proxied = !ownToken;
   if (proxied) {
@@ -1195,7 +1245,8 @@ async function fightWith(member) {
 
     // 队长下达上场指令；队长没连上就由当前发送连接自己发。
     // 注意：setfighter 没有响应包（抓包里只推 roominfo），不能用等响应的 send。
-    const setBy = leaderToken && isConnected(leaderToken) ? leaderToken : sender;
+    const setBy =
+      leaderToken && isConnected(leaderToken) ? leaderToken : sender;
     addLog(getName(setBy), `→ setfighter { roleId: ${roleId} }`, "send");
     try {
       tokenStore.sendMessage(setBy, "nightmare_setfighter", {
@@ -1241,11 +1292,7 @@ async function fightWith(member) {
     if (fastMode.value) {
       await runFastFinish(fightAt, roomId, sender);
     } else {
-      addLog(
-        getName(sender),
-        "开战指令已发出，正在刷新房间取 CD…",
-        "success",
-      );
+      addLog(getName(sender), "开战指令已发出，正在刷新房间取 CD…", "success");
       await sleep(1200);
       const info = await syncRoomQuiet();
       if (info) {
@@ -1288,8 +1335,8 @@ async function restoreMember(member) {
     return;
   }
 
-  const leaderId = Number(room.leaderId || 0);
-  const leaderToken = leaderId ? await findTokenOfRole(leaderId) : "";
+  const leaderId = await ensureLeaderId();
+  const leaderToken = leaderId ? await resolveTokenOfRole(leaderId) : "";
   const ownToken = await findTokenOfRole(roleId);
   const sender = leaderToken || ownToken;
   if (!sender) {
@@ -1300,7 +1347,11 @@ async function restoreMember(member) {
 
   restoringRoleId.value = roleId;
   try {
-    addLog(getName(sender), `→ restore { roomId, roleId: ${roleId} }（${member.name}）`, "send");
+    addLog(
+      getName(sender),
+      `→ restore { roomId, roleId: ${roleId} }（${member.name}）`,
+      "send",
+    );
     const result = await send(sender, "nightmare_restore", { roomId, roleId });
     if (!result.ok) return;
     await sleep(500);
@@ -1401,6 +1452,64 @@ function applyRoomLineup(info) {
   if (!cards.some((card) => card.heroes.length)) return 0;
   lineup.value = cards;
   return cards.length;
+}
+
+/**
+ * 队长 roleId（setfighter 必须由队长发，缺失就会被服务端判「无权限」）。
+ *
+ * `room.leaderId` 只有收到房间帧（推送 / getroominfo）后才有；刚开团时如果
+ * 只重放到半截帧、或者游戏页没开导致一帧都没有，这里就是 0，于是 setfighter
+ * 会由队员自己发出去 → 服务端回无权限。
+ * 所以缺失时依次从「队伍数据」和「getroominfo 快照」补。
+ */
+async function ensureLeaderId() {
+  const known = Number(room.leaderId || 0);
+  if (known) return known;
+
+  const tokenId =
+    selected.value.find((id) => isConnected(id)) ||
+    tokens.value.find((item) => isConnected(item.id))?.id ||
+    "";
+  const target = teamId.value || String(room.matchTeamId || "");
+
+  if (tokenId && target) {
+    const team = await analyzeTeam(tokenId, target);
+    const lid = Number(team?.leaderId || 0);
+    if (lid) {
+      room.leaderId = lid;
+      addLog("系统", `房间帧里没有队长，已从队伍数据补上：${lid}`, "info");
+      return lid;
+    }
+  }
+
+  if (tokenId && room.roomId) {
+    await syncRoomQuiet();
+    const lid = Number(room.leaderId || 0);
+    if (lid) return lid;
+  }
+  return 0;
+}
+
+/**
+ * 找某个 roleId 的连接，没连就按房间帧里的昵称猜出 token 并连上。
+ * 用于队长：setfighter 缺了队长连接必然被判「无权限」。
+ */
+async function resolveTokenOfRole(roleId) {
+  const target = Number(roleId || 0);
+  if (!target) return "";
+  const existing = await findTokenOfRole(target);
+  if (existing) return existing;
+
+  const name = (room.fightRoleBase || []).find(
+    (member) => Number(member.roleId) === target,
+  )?.name;
+  const guess = tokenGuessByName(name);
+  if (!guess) return "";
+  if (!(await ensureConnected(guess))) return "";
+  const rid = await getRoleId(guess);
+  if (Number(rid) !== target) return "";
+  addLog(getName(guess), `按昵称匹配到队长（${name}），已连接`, "info");
+  return guess;
 }
 
 async function refreshRoom() {
@@ -2413,10 +2522,10 @@ async function doQuery(ownerId) {
   const list = info?.fightRoleBase || [];
   addLog(
     getName(id),
-    `队伍 ${info?.teamId} state=${info?.state} 成员 ${list.length} 人：` +
+    `队伍 ${info?.teamId} state=${info?.state} 成员 ${list.length} 人：${ 
       list
         .map((m) => `${m.name}(prepared=${m.prepared},power=${m.power})`)
-        .join(" / "),
+        .join(" / ")}`,
     "info",
   );
 }
@@ -2445,18 +2554,42 @@ async function doDismiss() {
   }
 }
 
+/** 当前账号所在的十殿队伍（teamCfgId=1），没有则返回 null */
+async function currentNightmareTeam(tokenId) {
+  const teams = (await fetchMyTeams(tokenId)) || [];
+  return (
+    teams.find(
+      (team) =>
+        team.teamCfgId === NIGHTMARE_TEAM_CFG_ID && Boolean(team.teamId),
+    ) || null
+  );
+}
+
+/**
+ * 退出队伍：`matchteam_dismiss { teamId }`。
+ * 队长调用是「解散」，普通成员调用是「离队」——这里只对非队长使用。
+ */
+async function leaveTeam(tokenId, id) {
+  if (!(await ensureConnected(tokenId))) {
+    return { ok: false, reason: "连接失败" };
+  }
+  const result = await send(tokenId, "matchteam_dismiss", { teamId: id });
+  if (result.ok) {
+    addLog(getName(tokenId), `已退出队伍 ${id}`, "success");
+    return { ok: true };
+  }
+  return { ok: false, reason: result.error?.message || "未知错误" };
+}
+
 async function runAll() {
   if (running.value) return;
   if (selected.value.length < 2) {
-    message.warning("至少勾选 2 个账号：第一个建队，其余加入");
+    message.warning("至少勾选 2 个账号：队长 + 至少 1 个队员");
     return;
   }
   running.value = true;
   try {
-    addLog("系统", "开始一键组队", "info");
-
-    // 1) 先并行把所有账号连上。以前是边做边连，单个超时 4 秒就会连锁
-    //    导致后面"未加入就准备"（7800320）
+    addLog("系统", "开始一键组队（自动校正队伍归属）", "info");
     const online = await connectAll(selected.value);
     if (online.length < 2) {
       addLog("系统", `可用账号不足（连上 ${online.length} 个），中止`, "error");
@@ -2464,61 +2597,170 @@ async function runAll() {
       return;
     }
 
-    // 2) 队长 = 第一个连上的账号
-    const leader = online[0];
-    const created = await doCreate(leader);
-    if (!created) {
-      message.error("建队失败，流程中止");
+    // 1) 队长：房间帧 > 目标队伍 > 第一个勾选账号
+    let leaderId = Number(room.leaderId || 0);
+    if (!leaderId && teamId.value) {
+      const team = await analyzeTeam(online[0], teamId.value);
+      leaderId = Number(team?.leaderId || 0);
+    }
+    if (!leaderId) {
+      leaderId = Number(await getRoleId(online[0])) || 0;
+      addLog(
+        "系统",
+        `没有房间/队伍信息，按勾选顺序把 ${getName(online[0])} 当队长`,
+        "info",
+      );
+    }
+
+    // 2) 队长连接必须在线（按房间帧昵称自动适配 token）
+    const leaderToken = await resolveTokenOfRole(leaderId);
+    const leaderName =
+      (room.fightRoleBase || []).find(
+        (member) => Number(member.roleId) === leaderId,
+      )?.name || String(leaderId);
+    if (!leaderToken) {
+      message.error(
+        `缺少队长连接：${leaderName}（roleId=${leaderId}），请勾选并连接队长账号`,
+      );
+      addLog(
+        "系统",
+        `缺少队长连接：队长 ${leaderName}(${leaderId}) 不在已连接账号里，中止`,
+        "error",
+      );
       return;
     }
-    await sleep(500);
+    if (!online.includes(leaderToken)) {
+      message.error(`缺少队长连接：${getName(leaderToken)} 未在本次连接列表`);
+      addLog(
+        "系统",
+        `队长 ${getName(leaderToken)} 不在本次在线列表，中止`,
+        "error",
+      );
+      return;
+    }
+    room.leaderId = leaderId;
 
-    // 3) 先分析队伍现状：谁在队里、谁是队长、谁已准备
-    const team0 = await analyzeTeam(leader, created);
-    addLog("系统", `① 队伍分析：${formatTeam(team0)}`, "info");
+    // 3) 目标队伍：优先当前房间的 matchTeamId，其次输入框，最后队长已有队伍
+    let target = String(room.matchTeamId || teamId.value || "");
+    const leaderTeam = await currentNightmareTeam(leaderToken);
+    if (!target && leaderTeam) {
+      target = leaderTeam.teamId;
+      addLog("系统", `队长已在十殿队伍 ${target}，直接复用`, "info");
+    }
+    if (!target) {
+      target = await doCreate(leaderToken);
+      if (!target) {
+        message.error("建队失败，流程中止");
+        return;
+      }
+      await sleep(500);
+    }
+    teamId.value = target;
+    room.matchTeamId = target;
+    addLog(
+      "系统",
+      `目标队伍 ${target}｜队长 ${leaderName}(${leaderId})`,
+      "info",
+    );
 
-    // 4) 补齐未加入的人（已在队里的不再 join，避免 7100020）
+    // 4) 队伍现状（目标队伍失效时回退到队长当前队伍）
+    let team0 = await analyzeTeam(leaderToken, target);
+    if (!team0 || !team0.members.has(leaderId)) {
+      const fallback = await currentNightmareTeam(leaderToken);
+      if (fallback && String(fallback.teamId) !== String(target)) {
+        target = fallback.teamId;
+        teamId.value = target;
+        room.matchTeamId = target;
+        addLog("系统", `目标队伍无效，改用队长当前队伍 ${target}`, "warning");
+        team0 = await analyzeTeam(leaderToken, target);
+      }
+    }
+    addLog("系统", `① 队伍现状：${formatTeam(team0)}`, "info");
+    if (!team0 || !team0.members.has(leaderId)) {
+      message.error("队长不在目标队伍里（队伍可能已解散），请重新开团/建队");
+      addLog("系统", "队长不在目标队伍，中止", "error");
+      return;
+    }
+
+    // 5) 逐个校正：在别的队伍先退出，再重新加入队长队伍
     const joinResults = [];
-    for (const tokenId of online.slice(1)) {
-      const roleId = await getRoleId(tokenId);
+    for (const tokenId of online) {
+      const roleId = Number(await getRoleId(tokenId));
       const name = getName(tokenId);
-      if (team0 && team0.members.has(roleId)) {
-        addLog(name, `已在队伍 ${created} 中，跳过加入`, "info");
+      if (!roleId) {
+        joinResults.push({ id: tokenId, ok: false, reason: "拿不到 roleId" });
+        continue;
+      }
+      if (roleId === leaderId) {
+        addLog(name, "队长：不退出、不准备", "info");
+        joinResults.push({ id: tokenId, ok: true, leader: true });
+        continue;
+      }
+
+      const current = await currentNightmareTeam(tokenId);
+      const inTarget = Boolean(
+        current && String(current.teamId) === String(target),
+      );
+      let reopened = false;
+
+      if (current && !inTarget) {
+        addLog(
+          name,
+          `当前在队伍 ${current.teamId}，不是队长队伍，先退出`,
+          "warning",
+        );
+        const left = await leaveTeam(tokenId, current.teamId);
+        if (!left.ok) {
+          joinResults.push({
+            id: tokenId,
+            ok: false,
+            reason: `退出旧队失败：${left.reason}`,
+          });
+          continue;
+        }
+        reopened = true;
+        await sleep(400);
+      }
+
+      if (inTarget) {
+        addLog(name, `已在队长队伍 ${target}，跳过加入`, "info");
         joinResults.push({ id: tokenId, ok: true, already: true });
         continue;
       }
-      const r = await joinOne(tokenId, created);
-      joinResults.push({ id: tokenId, ...r });
+
+      const joined = await joinOne(tokenId, target);
+      joinResults.push({ id: tokenId, ...joined, reopened });
       await sleep(400);
     }
 
-    // 5) 加入后重新分析，拿到最新的 prepared 状态
-    const team1 = await analyzeTeam(leader, created);
-    addLog("系统", `② 加入后分析：${formatTeam(team1)}`, "info");
+    // 6) 重新分析，只为未准备的人准备（队长跳过）
+    const team1 = await analyzeTeam(leaderToken, target);
+    addLog("系统", `② 校正后：${formatTeam(team1)}`, "info");
+    const prepareResults = await prepareByTeam(team1, online, target);
 
-    // 6) 只给"未准备"的人准备
-    const prepareResults = await prepareByTeam(team1, online, created);
-
-    // 7) 最终核对
-    const team2 = await analyzeTeam(leader, created);
+    // 7) 最终核对 + 拉阵容
+    const team2 = await analyzeTeam(leaderToken, target);
     addLog("系统", `③ 最终状态：${formatTeam(team2)}`, "success");
-    teamId.value = created;
+    await loadLineup(leaderToken);
 
-    // 8) 拉一遍每个人的上阵阵容，渲染卡片
-    await loadLineup(leader);
-
-    // 6) 汇总每个账号的结果，一眼看出谁没成功
+    // 8) 汇总
     const rows = [];
     for (const tokenId of online) {
-      const join = joinResults.find((r) => r.id === tokenId);
-      const prep = prepareResults.find((r) => r.id === tokenId);
+      const join = joinResults.find((item) => item.id === tokenId);
+      const prep = prepareResults.find((item) => item.id === tokenId);
       const joinText = !join
-        ? "队长"
-        : join.ok
-          ? join.already
-            ? "已在队中"
-            : "已加入"
-          : `失败(${join.reason})`;
+        ? "—"
+        : join.leader
+          ? "队长"
+          : join.reopened
+            ? join.ok
+              ? "退队后重新加入"
+              : `退队后加入失败(${join.reason})`
+            : join.ok
+              ? join.already
+                ? "已在队伍"
+                : "已加入"
+              : `失败(${join.reason})`;
       const prepText = !prep
         ? "—"
         : prep.skipped === "leader"
@@ -2530,7 +2772,9 @@ async function runAll() {
               : `失败(${prep.reason})`;
       rows.push(`${getName(tokenId)}: ${joinText} / ${prepText}`);
     }
-    const failed = [...joinResults, ...prepareResults].filter((r) => !r.ok);
+    const failed = [...joinResults, ...prepareResults].filter(
+      (item) => !item.ok,
+    );
     addLog(
       "系统",
       `组队结果（${online.length} 人）：${rows.join("；")}`,
@@ -2539,7 +2783,7 @@ async function runAll() {
     if (failed.length) {
       message.warning(`有 ${failed.length} 个账号未成功，详见日志`);
     } else {
-      message.success("组队完成");
+      message.success("组队完成（队伍已校正）");
     }
   } finally {
     running.value = false;

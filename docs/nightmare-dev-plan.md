@@ -317,6 +317,26 @@ matchteam_join, { teamId: "10005921" }
 ⑦ 再查一次，输出最终状态
 ```
 
+#### 一键组队（自动校正版，2026-11-18）
+
+实验台「一键组队」在旧流程上加了三步校正，逻辑按「服务端事实」而不是「本地勾选顺序」：
+
+```
+① 队长 roleId：房间帧 room.leaderId > 目标队伍 leaderId > 第一个勾选账号
+② 队长连接：按房间帧昵称自动匹配 token 并连上；仍找不到 →
+   直接报错「缺少队长连接：<昵称>(roleId)，请勾选并连接队长账号」并中止
+③ 目标队伍：room.matchTeamId > 输入框 > 队长当前 cfg=1 队伍 > 新建
+④ 逐个账号查 matchteam_getroleteaminfo：
+     在别的 cfg=1 队伍 → matchteam_dismiss { teamId } 退出（仅非队长），再 join 队长队伍
+     已在队长队伍       → 跳过加入
+     队长本人           → 不退出、不准备（服务端不允许队长准备）
+⑤ 重新 getteaminfo，只对 prepared=0 的队员发 memberprepare
+⑥ 再查一次输出最终状态，并把 fightRoleBase 的 5 人布阵渲染成卡片
+```
+
+注意：`matchteam_dismiss` 对队长是「解散」、对普通成员是「离队」，所以只在非队长身上调用。
+目标队伍若已失效（analyzeTeam 拿不到队长），会回退到队长当前所在队伍，避免拿旧 teamId 白跑。
+
 **三个必须注意的坑：**
 
 | 坑 | 现象 | 处理 |

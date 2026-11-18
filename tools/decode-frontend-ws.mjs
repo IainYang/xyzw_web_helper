@@ -31,6 +31,21 @@ const statsOnly = args.includes("--stats");
 const cmdFilter = takeOption("--cmd");
 const grepFilter = takeOption("--grep");
 const fileArg = takeOption("--file");
+const sinceArg = takeOption("--since");
+
+// --since 21:56 或 --since 21:56:30：只看这个本地时间之后的帧
+let sinceTs = 0;
+if (sinceArg) {
+  const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(sinceArg);
+  if (hm) {
+    const d = new Date();
+    d.setHours(Number(hm[1]), Number(hm[2]), Number(hm[3] || 0), 0);
+    sinceTs = d.getTime();
+    console.log(`只统计 ${d.toLocaleString()} 之后的帧`);
+  } else if (Number(sinceArg) > 0) {
+    sinceTs = Number(sinceArg);
+  }
+}
 
 function latestLogFile() {
   if (!fs.existsSync(LOG_DIR)) return null;
@@ -99,9 +114,7 @@ function decodeFrame(meta) {
   }
 }
 
-const file = fileArg
-  ? path.resolve(process.cwd(), fileArg)
-  : latestLogFile();
+const file = fileArg ? path.resolve(process.cwd(), fileArg) : latestLogFile();
 
 if (!file || !fs.existsSync(file)) {
   console.error(
@@ -135,6 +148,11 @@ for (const line of lines) {
   }
   const meta = entry?.meta;
   if (!meta || !meta.dir) continue;
+
+  if (sinceTs && entry.ts) {
+    const ts = new Date(entry.ts).getTime();
+    if (Number.isFinite(ts) && ts < sinceTs) continue;
+  }
 
   const decoded = decodeFrame(meta);
   if (!decoded) continue;
