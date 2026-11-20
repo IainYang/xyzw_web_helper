@@ -211,8 +211,10 @@ export const getActivityStatus = () => {
     isarenaActivityOpen: hour >= 6 && hour < 22,
     // 当前活动周
     currentActivityWeek,
-    // 怪异塔活动开放 (黑市周)
-    isWeirdTowerActivityOpen: currentActivityWeek === "黑市周",
+    // 怪异塔活动开放 (黑市周，且周五 11:30 提前关闭)
+    isWeirdTowerActivityOpen:
+      currentActivityWeek === "黑市周" &&
+      !(day === 5 && (hour > 11 || (hour === 11 && now.getMinutes() >= 30))),
   };
 };
 

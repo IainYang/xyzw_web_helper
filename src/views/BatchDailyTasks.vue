@@ -3229,13 +3229,10 @@ const getCurrentActivityWeek = computed(() => {
 
 const isWeirdTowerActivityOpen = computed(() => {
   if (getCurrentActivityWeek.value !== "黑市周") return false;
-
+  // 怪异塔比常规周期提前 30 分钟结束：黑市周的周五 11:30 关闭（其余活动仍按 12:00）
   const now = new Date();
-  const day = now.getDay();
-  const hour = now.getHours();
-  // 如果是周五，必须在12点之后
-  if (day === 5) {
-    return hour >= 12;
+  if (now.getDay() === 5) {
+    return now.getHours() * 60 + now.getMinutes() < 11 * 60 + 30;
   }
   return true;
 });
