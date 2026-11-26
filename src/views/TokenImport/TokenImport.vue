@@ -2934,6 +2934,51 @@ onUnmounted(() => {
     flex-direction: column;
     gap: var(--spacing-sm);
   }
+
+  /* ===== Token 列表移动端优化 ===== */
+
+  /* 去掉容器高度限制，改为整页滚动（原来是内部滚动，手机上体验很差） */
+  .tokens-section {
+    max-height: none;
+    overflow: visible;
+    padding: 16px;
+  }
+
+  .tokens-grid,
+  .tokens-list {
+    overflow: visible;
+    flex: none;
+    padding-right: 0;
+  }
+
+  /* 顶部一排操作按钮：缩小高度和字号，别占半屏 */
+  .header-actions {
+    gap: 6px;
+
+    :deep(.n-button) {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    :deep(.n-button .n-icon) {
+      font-size: 14px;
+    }
+  }
+
+  /* 列表信息字号放大，卡片内按钮也不至于太小 */
+  .token-name {
+    font-size: 15px;
+  }
+
+  :deep(.token-card .n-button--small-type),
+  :deep(.token-card .n-button) {
+    font-size: 12px;
+  }
+
+  .section-header h2 {
+    font-size: 17px;
+  }
 }
 
 /* 存储信息样式 */
