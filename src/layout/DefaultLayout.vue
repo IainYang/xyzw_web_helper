@@ -115,6 +115,7 @@
             <span>实时盐场</span>
           </router-link>
           <button
+            v-if="!authStore.authDisabled"
             type="button"
             class="nav-item nav-logout"
             :title="`当前账号：${authStore.user?.username || ''}`"
@@ -258,6 +259,7 @@
           <span>实时盐场</span>
         </router-link>
         <router-link
+          v-if="!authStore.authDisabled"
           to="/admin/profile"
           class="drawer-item"
           @click="isMobileMenuOpen = false"
@@ -279,6 +281,7 @@
           <span>用户管理</span>
         </router-link>
         <button
+          v-if="!authStore.authDisabled"
           type="button"
           class="drawer-item drawer-logout"
           @click="handleMobileLogout"
@@ -315,7 +318,7 @@ import {
   Settings,
 } from "@vicons/ionicons5";
 import { useMessage } from "naive-ui";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import { useRouter } from "vue-router";
 import ThemeToggle from "@/components/Common/ThemeToggle.vue";
@@ -333,16 +336,22 @@ const isMobileMenuOpen = ref(false);
 /** 修改密码弹窗（普通用户也可用） */
 const showChangePassword = ref(false);
 
-const userMenuOptions = [
-  {
-    label: "修改密码",
-    key: "changePassword",
-  },
-  {
-    label: "清除所有Token并退出",
-    key: "logout",
-  },
-];
+// 没有后端（静态部署）时不显示登录相关入口：改密/退出都没有意义
+const userMenuOptions = computed(() => {
+  if (authStore.authDisabled) {
+    return [{ label: "清除所有Token", key: "logout" }];
+  }
+  return [
+    {
+      label: "修改密码",
+      key: "changePassword",
+    },
+    {
+      label: "清除所有Token并退出",
+      key: "logout",
+    },
+  ];
+});
 
 /** 移动端抽屉里的登出：先收起抽屉，再走同一套登出逻辑 */
 const handleMobileLogout = async () => {

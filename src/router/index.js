@@ -219,7 +219,7 @@ const router = createRouter({
 autoRoutes.handleHotUpdate?.(router);
 
 // 导航守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const tokenStore = useTokenStore();
   const authStore = useAuthStore();
 
@@ -227,8 +227,17 @@ router.beforeEach((to, from, next) => {
   document.title = to.meta.title
     ? `${to.meta.title} - XYZW 游戏管理系统`
     : "XYZW 游戏管理系统";
-  // 登录页：已登录直接进后台，未登录放行
+
+  // 先确认这套部署有没有后端：静态托管（没有 /auth/*）时账户体系不成立，跳过登录
+  await authStore.ensureReady();
+  const authDisabled = authStore.authDisabled;
+
+  // 登录页：已登录直接进后台，未登录放行；没有后端时登录页无意义，直接进 Token 页
   if (to.path === "/login" || to.meta.requiresAuth === false) {
+    if (authDisabled) {
+      next("/tokens");
+      return;
+    }
     if (to.path === "/login" && authStore.isAuthenticated) {
       next("/admin/dashboard");
       return;

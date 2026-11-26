@@ -9,8 +9,22 @@
             <div class="header-user">
               <!-- 主题切换按钮 -->
               <ThemeToggle />
+              <!-- 静态部署（无后端）时账户体系不成立，给个明确标识 -->
+              <n-tag
+                v-if="authStore.authDisabled"
+                size="small"
+                type="warning"
+                :bordered="false"
+                :title="authStore.probeReason || '未检测到后端接口，已跳过登录'"
+              >
+                本地模式
+              </n-tag>
               <!-- 这个页面不在后台布局里，普通用户没有别的地方能改密/登出 -->
-              <n-dropdown :options="userMenuOptions" @select="handleUserAction">
+              <n-dropdown
+                v-if="!authStore.authDisabled"
+                :options="userMenuOptions"
+                @select="handleUserAction"
+              >
                 <div class="user-info" :title="authStore.userInfo?.username || ''">
                   <n-avatar size="small" src="/icons/xiaoyugan.png" />
                   <span class="user-name">{{

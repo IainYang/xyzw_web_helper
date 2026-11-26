@@ -678,6 +678,20 @@ app.post("/auth/login", (req, res) => {
   res.json({ token, user: publicUser(user) });
 });
 
+/**
+ * 部署探测：前端启动时用它判断「这套部署到底有没有后端」。
+ * 纯静态托管（GitHub Pages / OSS / 只放 dist 的 nginx）会把这个路径回退成
+ * index.html，前端据此跳过登录流程；返回 JSON 则说明账户体系可用。
+ */
+app.get("/auth/probe", (req, res) => {
+  res.json({
+    ok: true,
+    requireLogin: REQUIRE_LOGIN,
+    auth: "on",
+    time: new Date().toISOString(),
+  });
+});
+
 app.get("/auth/me", requireUser, (req, res) => {
   res.json({ user: req.authUser });
 });

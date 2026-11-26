@@ -216,7 +216,13 @@ function onForgotPassword() {
   });
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 没有后端（纯静态部署）时登录不成立，直接跳过
+  await authStore.ensureReady();
+  if (authStore.authDisabled) {
+    router.replace("/tokens");
+    return;
+  }
   // 如果已经登录，直接跳转
   if (authStore.isAuthenticated) {
     router.push("/admin/dashboard");
