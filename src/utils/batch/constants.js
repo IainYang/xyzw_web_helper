@@ -64,6 +64,7 @@ export const availableTasks = [
   { label: "一键购买四圣碎片", value: "legion_storebuygoods" },
   { label: "一键配置黑市采购清单", value: "store_syncpurchaseconfig" },
   { label: "一键黑市采购", value: "store_purchase" },
+  { label: "一键黑市采购（按计划）", value: "store_purchaseByPlan" },
   { label: "免费领取珍宝阁", value: "collection_claimfreereward" },
   { label: "批量领取功法残卷", value: "batchLegacyClaim" },
   { label: "批量赠送功法残卷", value: "batchLegacyGiftSendEnhanced" },

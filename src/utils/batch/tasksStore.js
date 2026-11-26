@@ -471,6 +471,86 @@ export function createTasksStore(deps) {
   /**
    * 黑市一键采购
    */
+  const store_purchase = async () => {
+    if (selectedTokens.value.length === 0) return;
+
+    isRunning.value = true;
+    shouldStop.value = false;
+
+    selectedTokens.value.forEach((id) => {
+      tokenStatus.value[id] = "waiting";
+    });
+
+    const taskPromises = selectedTokens.value.map(async (tokenId) => {
+      if (shouldStop.value) return;
+
+      tokenStatus.value[tokenId] = "running";
+      const token = tokens.value.find((t) => t.id === tokenId);
+
+      try {
+        addLog({
+          time: new Date().toLocaleTimeString(),
+          message: `=== 开始黑市一键采购: ${token.name} ===`,
+          type: "info",
+        });
+
+        await ensureConnection(tokenId);
+
+        addLog({
+          time: new Date().toLocaleTimeString(),
+          message: `${token.name} 发送黑市采购请求...`,
+          type: "info",
+        });
+
+        const result = await tokenStore.sendMessageWithPromise(
+          tokenId,
+          "store_purchase",
+          {},
+          5000,
+        );
+
+        await sleep(delayConfig.action);
+
+        if (result.error) {
+          addLog({
+            time: new Date().toLocaleTimeString(),
+            message: `${token.name} 黑市采购失败: ${result.error}`,
+            type: "error",
+          });
+          tokenStatus.value[tokenId] = "failed";
+        } else {
+          addLog({
+            time: new Date().toLocaleTimeString(),
+            message: `${token.name} 黑市采购成功`,
+            type: "success",
+          });
+          tokenStatus.value[tokenId] = "completed";
+        }
+      } catch (error) {
+        addLog({
+          time: new Date().toLocaleTimeString(),
+          message: `${token.name} 黑市采购过程出错: ${error.message}`,
+          type: "error",
+        });
+        tokenStatus.value[tokenId] = "failed";
+      } finally {
+        tokenStore.closeWebSocketConnection(tokenId);
+        releaseConnectionSlot();
+        addLog({
+          time: new Date().toLocaleTimeString(),
+          message: `${token.name} 连接已关闭 (队列: ${connectionQueue.active}/${batchSettings.maxActive})`,
+          type: "info",
+        });
+      }
+    });
+
+    await Promise.all(taskPromises);
+
+    currentRunningTokenId.value = null;
+    isRunning.value = false;
+    shouldStop.value = false;
+  };
+
   /**
    * 黑市一键采购：按账号已保存的「购买计划」执行。
    *
@@ -479,7 +559,7 @@ export function createTasksStore(deps) {
    * 金砖不够时立即停手，不把余额花穿。
    * 日志只留一行：买了几个、分别是什么、刷了几次、哪些因超价/金砖不足没买。
    */
-  const store_purchase = async () => {
+  const store_purchaseByPlan = async () => {
     if (selectedTokens.value.length === 0) return;
 
     isRunning.value = true;
@@ -667,6 +747,7 @@ export function createTasksStore(deps) {
     legion_storebuygoods,
     legionStoreBuySkinCoins,
     store_purchase,
+    store_purchaseByPlan,
     store_syncpurchaseconfig,
     collection_claimfreereward,
   };

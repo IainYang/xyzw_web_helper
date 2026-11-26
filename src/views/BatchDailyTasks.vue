@@ -393,6 +393,15 @@
                 </n-button>
                 <n-button
                   size="small"
+                  type="primary"
+                  ghost
+                  @click="store_purchaseByPlan"
+                  :disabled="isRunning || selectedTokens.length === 0"
+                >
+                  按计划采购
+                </n-button>
+                <n-button
+                  size="small"
                   @click="collection_claimfreereward"
                   :disabled="isRunning || selectedTokens.length === 0"
                 >
@@ -4785,6 +4794,7 @@ function getScheduledTask(taskName) {
     legion_storebuygoods,
     store_syncpurchaseconfig,
     store_purchase,
+    store_purchaseByPlan,
     collection_claimfreereward,
     batchLegacyClaim,
     batchLegacyGiftSendEnhanced,
@@ -6256,6 +6266,7 @@ const {
   legionStoreBuySkinCoins,
   store_syncpurchaseconfig,
   store_purchase,
+  store_purchaseByPlan,
   collection_claimfreereward,
 } = tasksStore;
 
