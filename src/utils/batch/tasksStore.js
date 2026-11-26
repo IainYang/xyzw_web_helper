@@ -474,9 +474,10 @@ export function createTasksStore(deps) {
   /**
    * 黑市一键采购：按账号已保存的「购买计划」执行。
    *
-   * 计划在「个人日常」页的黑市商品卡片里配置（勾选商品 + 心理价）。
-   * 没有计划的账号直接跳过并提示去处；现价高于心理价的商品不买。
-   * 日志只留一行：买了几个、分别是什么、哪些因超价没买。
+   * 计划在「个人日常」页的黑市商品卡片里配置（勾选商品 + 心理价 + 刷新次数）。
+   * 没配计划的账号跳过并提示去处；现价高于心理价的商品不买；
+   * 金砖不够时立即停手，不把余额花穿。
+   * 日志只留一行：买了几个、分别是什么、刷了几次、哪些因超价/金砖不足没买。
    */
   const store_purchase = async () => {
     if (selectedTokens.value.length === 0) return;
@@ -494,6 +495,8 @@ export function createTasksStore(deps) {
       tokenStatus.value[tokenId] = "running";
       const token = tokens.value.find((t) => t.id === tokenId);
       const nameOf = (goodsId) => getGoodsName(goodsId) || `${goodsId} 号`;
+      const goldNow = () =>
+        Number(tokenStore.gameData?.roleInfo?.role?.diamond ?? 0) || 0;
 
       try {
         await ensureConnection(tokenId);
@@ -510,64 +513,127 @@ export function createTasksStore(deps) {
           return;
         }
 
-        const res = await tokenStore.sendMessageWithPromise(
-          tokenId,
-          "store_goodslist",
-          { storeId: 1 },
-          15000,
-        );
-        const goods = res?.goodsList ?? {};
-        const rows = Object.entries(goods).map(([id, value]) => ({
-          goodsId: Number(id),
-          ...(value || {}),
-        }));
+        // 先刷一次余额，后面的金砖判断才不是 0
+        await tokenStore.sendGetRoleInfo(tokenId).catch(() => null);
 
+        const maxRefresh = Math.max(0, Number(plan.maxRefresh) || 0);
         const bought = [];
         const tooExpensive = [];
-        const missing = [];
+        const missing = new Set();
+        const failed = [];
+        let refreshUsed = 0;
+        let goldShortAt = null;
 
-        for (const goodsId of planIds) {
-          if (shouldStop.value) break;
-          const row = rows.find((r) => Number(r.goodsId) === Number(goodsId));
-          if (!row) {
-            missing.push(nameOf(goodsId));
-            continue;
+        const readRows = async () => {
+          const res = await tokenStore.sendMessageWithPromise(
+            tokenId,
+            "store_goodslist",
+            { storeId: 1 },
+            15000,
+          );
+          const goods = res?.goodsList ?? {};
+          return Object.entries(goods).map(([id, value]) => ({
+            goodsId: Number(id),
+            ...(value || {}),
+          }));
+        };
+
+        /** 跑一轮：把这批里还没买到的逐件过一遍，返回本轮买到的件数 */
+        const runRound = async () => {
+          const rows = await readRows();
+          let boughtThisRound = 0;
+
+          for (const goodsId of planIds) {
+            if (shouldStop.value || goldShortAt !== null) break;
+
+            const row = rows.find((r) => Number(r.goodsId) === Number(goodsId));
+            if (!row) {
+              missing.add(nameOf(goodsId));
+              continue;
+            }
+            // 本批已经买过（买过一次就算，不重复提交）
+            if (Number(row.buy_quantity ?? 0) >= 1) continue;
+
+            const limit = Number(plan.items[String(goodsId)]) || 0;
+            const price = getGoodsFinalPrice(goodsId, row.discount);
+            if (price == null) {
+              missing.add(nameOf(goodsId));
+              continue;
+            }
+            if (price > limit) {
+              tooExpensive.push(`${nameOf(goodsId)}(${price} > ${limit})`);
+              continue;
+            }
+            // 金砖前置判断：不够就停手，别等服务端报错
+            const gold = goldNow();
+            if (price > gold) {
+              goldShortAt = gold;
+              break;
+            }
+
+            try {
+              await tokenStore.sendMessageWithPromise(
+                tokenId,
+                "store_buy",
+                { goodsId },
+                8000,
+              );
+              bought.push(`${nameOf(goodsId)} ${price}`);
+              boughtThisRound += 1;
+              await sleep(delayConfig.action);
+              await tokenStore.sendGetRoleInfo(tokenId).catch(() => null);
+            } catch (error) {
+              failed.push(`${nameOf(goodsId)}(${error?.message ?? "失败"})`);
+            }
           }
-          const limit = Number(plan.items[String(goodsId)]) || 0;
-          const price = getGoodsFinalPrice(goodsId, row.discount);
-          if (price == null || price > limit) {
-            tooExpensive.push(`${nameOf(goodsId)}(${price ?? "?"} > ${limit})`);
-            continue;
-          }
-          try {
-            await tokenStore.sendMessageWithPromise(
-              tokenId,
-              "store_buy",
-              { goodsId },
-              8000,
-            );
-            bought.push(`${nameOf(goodsId)} ${price}`);
-            await sleep(delayConfig.action);
-          } catch (error) {
-            tooExpensive.push(
-              `${nameOf(goodsId)}(购买失败: ${error?.message ?? "未知"})`,
-            );
-          }
+          return boughtThisRound;
+        };
+
+        await runRound();
+
+        // 还有没买到的、且计划允许刷新，就刷新继续
+        while (!shouldStop.value && refreshUsed < maxRefresh) {
+          if (goldShortAt !== null) break;
+          const rows = await readRows();
+          const pending = planIds.filter((goodsId) => {
+            const row = rows.find((r) => Number(r.goodsId) === Number(goodsId));
+            return Number(row?.buy_quantity ?? 0) < 1;
+          });
+          if (!pending.length) break;
+
+          await tokenStore.sendMessageWithPromise(
+            tokenId,
+            "store_refresh",
+            { storeId: 1 },
+            15000,
+          );
+          // 给服务端落新数据的时间
+          await sleep(600);
+          refreshUsed += 1;
+          await runRound();
         }
 
+        // ---- 一行汇总 ----
         const parts = [];
         parts.push(
           bought.length
             ? `买了 ${bought.length} 个：${bought.join("、")}`
-            : "没有可买的商品",
+            : "没有买到商品",
         );
+        if (refreshUsed) parts.push(`刷新 ${refreshUsed} 次`);
+        if (goldShortAt !== null) {
+          parts.push(`金砖不足（剩 ${goldShortAt}），已停止购买`);
+        }
         if (tooExpensive.length) {
           parts.push(
             `${tooExpensive.length} 个超出计划金额未买：${tooExpensive.join("、")}`,
           );
         }
-        if (missing.length) {
-          parts.push(`本批没有 ${missing.length} 个：${missing.join("、")}`);
+        if (failed.length) {
+          parts.push(`${failed.length} 个购买失败：${failed.join("、")}`);
+        }
+        if (missing.size) {
+          parts.push(`本批没有：${[...missing].join("、")}`);
         }
 
         addLog({
