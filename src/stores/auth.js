@@ -103,6 +103,30 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
+  /**
+   * 自助修改密码（普通用户也能用）。
+   * 成功后后端会把 tokenEpoch +1，当前 token 立即失效，所以这里顺带登出。
+   * @param {string} oldPassword 当前密码
+   * @param {string} newPassword 新密码
+   * @returns {Promise<{success: boolean, message?: string}>} 是否成功及失败原因
+   */
+  const changePassword = async (oldPassword, newPassword) => {
+    try {
+      const res = await fetch("/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, message: data.error || "修改失败" };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error?.message || "网络异常" };
+    }
+  };
+
   /** 拉取当前用户信息，顺便验证 token 是否还有效 */
   const fetchUserInfo = async () => {
     if (!token.value) return false;
@@ -137,6 +161,7 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     register,
     logout,
+    changePassword,
     fetchUserInfo,
     initAuth,
     authHeaders,

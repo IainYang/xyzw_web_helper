@@ -48,8 +48,11 @@
       <div class="loading">正在加载应用...</div>
     </div>
     <script type="module" src="/src/main.js"></script>
-    <script type="module" src="/src/xyzw/cocos2d-js-min.js"></script>
-    <script type="module" src="/src/xyzw/game-defines.js"></script>
-    <script type="module" src="/src/xyzw/index.js"></script>
+    <!-- 游戏加密模块（window.__require）：必须是 public 下的静态文件，
+         写成 /src/xyzw/* 时构建会丢弃这些 script，线上就没有 __require，
+         刷新 Token / 手机号验证码 / BIN 获取都会报「游戏加密模块未加载」 -->
+    <script type="module" src="/xyzw/cocos2d-js-min.js"></script>
+    <script type="module" src="/xyzw/game-defines.js"></script>
+    <script type="module" src="/xyzw/index.js"></script>
   </body>
 </html>

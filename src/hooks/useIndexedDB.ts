@@ -130,8 +130,14 @@ export function useIndexedDB(config: DBConfig = {}): UseIndexedDBReturn {
 
   /**
    * 获取 ArrayBuffer 数据
+   * @param {string} key 键
+   * @param {{silent?: boolean}} [options] silent=true 时不打印「未找到」警告（用于按 id / name 两次试探）
+   * @returns {Promise<ArrayBuffer | null>} 数据或 null
    */
-  const getArrayBuffer = async (key: string): Promise<ArrayBuffer | null> => {
+  const getArrayBuffer = async (
+    key: string,
+    options: { silent?: boolean } = {},
+  ): Promise<ArrayBuffer | null> => {
     if (!db.value) {
       error.value = "数据库未初始化";
       return null;
@@ -141,7 +147,7 @@ export function useIndexedDB(config: DBConfig = {}): UseIndexedDBReturn {
       const result = await db.value.get(storeName, key);
 
       if (!result) {
-        console.warn(`⚠️ 未找到键为 "${key}" 的数据`);
+        if (!options.silent) console.warn(`⚠️ 未找到键为 "${key}" 的数据`);
         return null;
       }
 

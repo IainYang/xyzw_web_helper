@@ -158,6 +158,8 @@ export const getServerList = async (arrayBuffer: ArrayBuffer) => {
         referrerPolicy: "no-referrer",
       },
       responseType: "arraybuffer",
+      // 没有超时的话，游戏服不响应时按钮会一直转圈
+      timeout: 20000,
     },
   );
   // console.log("res:", res);
@@ -165,7 +167,14 @@ export const getServerList = async (arrayBuffer: ArrayBuffer) => {
   const msg = g_utils.parse(res.data);
   // console.log("解析结果:", msg);
 
-  const data = msg.getData();
+  const data = msg?.getData?.();
+  if (!data?.roles) {
+    // BIN / combUser 失效、或游戏服返回错误包时，getData() 是 undefined，
+    // 直接展开会抛 "Cannot read properties of undefined (reading 'roles')"
+    throw new Error(
+      "游戏服没有返回角色列表，可能该账号的 BIN/combUser 已失效，请重新导入该账号",
+    );
+  }
   console.log("数据内容:", data);
   return JSON.stringify({
     ...data.roles,

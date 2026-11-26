@@ -153,6 +153,7 @@ import { NIcon, useDialog, useMessage } from "naive-ui";
 import { h } from "vue";
 import { useGameRolesStore } from "@/stores/gameRoles";
 import { useLocalTokenStore } from "@/stores/localTokenManager";
+import { copyText } from "@/utils/clipboard";
 
 const message = useMessage();
 const dialog = useDialog();
@@ -419,21 +420,11 @@ const editToken = (_roleId) => {
   message.info("编辑功能正在开发中");
 };
 
-// 复制Token到剪贴板
+// 复制Token到剪贴板（http 环境下走 execCommand 兜底，见 utils/clipboard.js）
 const copyToken = async (token) => {
-  try {
-    await navigator.clipboard.writeText(token);
-    message.success("Token已复制到剪贴板");
-  } catch (error) {
-    // 降级方案
-    const textArea = document.createElement("textarea");
-    textArea.value = token;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textArea);
-    message.success("Token已复制到剪贴板");
-  }
+  const ok = await copyText(token);
+  if (ok) message.success("Token已复制到剪贴板");
+  else message.warning("浏览器阻止了自动复制，请手动复制 Token");
 };
 
 // 从URL刷新Token

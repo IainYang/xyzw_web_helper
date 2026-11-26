@@ -6,8 +6,20 @@
         <div class="header-content">
           <div class="header-top">
             <img src="/icons/xiaoyugan.png" alt="XYZW" class="brand-logo" />
-            <!-- 主题切换按钮 -->
-            <ThemeToggle />
+            <div class="header-user">
+              <!-- 主题切换按钮 -->
+              <ThemeToggle />
+              <!-- 这个页面不在后台布局里，普通用户没有别的地方能改密/登出 -->
+              <n-dropdown :options="userMenuOptions" @select="handleUserAction">
+                <div class="user-info" :title="authStore.userInfo?.username || ''">
+                  <n-avatar size="small" src="/icons/xiaoyugan.png" />
+                  <span class="user-name">{{
+                    authStore.userInfo?.username || "未登录"
+                  }}</span>
+                  <NIcon><ChevronDown /></NIcon>
+                </div>
+              </n-dropdown>
+            </div>
           </div>
           <h1>游戏Token管理</h1>
         </div>
@@ -60,6 +72,7 @@
             <n-radio-button value="mobile"> 手机号验证码 </n-radio-button>
             <n-radio-button value="bin"> BIN多角色获取 </n-radio-button>
             <n-radio-button value="singlebin"> BIN单角色获取 </n-radio-button>
+            <n-radio-button value="syncCode"> 同步码导入 </n-radio-button>
           </n-radio-group>
         </div>
 
@@ -113,6 +126,11 @@
             @cancel="() => (showImportForm = false)"
             @ok="() => (showImportForm = false)"
             v-if="importMethod === 'singlebin'"
+          />
+          <SyncCodeForm
+            v-if="importMethod === 'syncCode'"
+            @cancel="() => (showImportForm = false)"
+            @ok="() => (showImportForm = false)"
           />
         </div>
       </a-modal>
@@ -227,6 +245,15 @@
                 </NIcon>
               </template>
               添加Token
+            </n-button>
+
+            <n-button secondary type="info" @click="openSyncModal('create')">
+              <template #icon>
+                <NIcon>
+                  <SyncCircle />
+                </NIcon>
+              </template>
+              同步码
             </n-button>
 
             <n-dropdown :options="bulkOptions" @select="handleBulkAction">
@@ -743,12 +770,22 @@
         </div>
       </template>
     </n-modal>
+
+    <!-- 跨端同步码：电脑端生成，手机端导入 -->
+    <SyncCodeModal
+      v-model:show="showSyncModal"
+      :selected-tokens="syncSelectedTokens"
+      :initial-tab="syncModalTab"
+    />
+
+    <ChangePasswordModal v-model:show="showChangePassword" />
   </div>
 </template>
 
 <script setup>
 import {
   Add,
+  ChevronDown,
   CloudUpload,
   Copy,
   Create,
@@ -768,8 +805,12 @@ import lz4 from "lz4js";
 import { NAlert, NIcon, useDialog, useMessage } from "naive-ui";
 import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import SyncCodeForm from "@/components/Token/SyncCodeForm.vue";
+import SyncCodeModal from "@/components/Token/SyncCodeModal.vue";
+import ChangePasswordModal from "@/components/User/ChangePasswordModal.vue";
 import useIndexedDB from "@/hooks/useIndexedDB";
 
+import { useAuthStore } from "@/stores/auth";
 import { $emit } from "@/stores/events/index.ts";
 import { selectedTokenId, useTokenStore } from "@/stores/tokenStore";
 import {
@@ -778,6 +819,7 @@ import {
   getBinPayload,
   getRoleBinFileName,
 } from "@/utils/binFile";
+import { copyText } from "@/utils/clipboard";
 import { restoreFullBackup, validateBackup } from "@/utils/fullBackup";
 import { prepareMultiGameLaunch } from "@/utils/gameLauncher";
 import {
@@ -786,6 +828,12 @@ import {
   toggleTokenSelection,
 } from "@/utils/gameSelection";
 import { scheduleAuthUserRequest, transformToken } from "@/utils/token";
+import {
+  attachTokenBins,
+  base64ToBuffer,
+  restoreTokenBins,
+  stripTokenBins,
+} from "@/utils/tokenBinBackup";
 import {
   generateBinFromCombUser,
   refreshTokenFromCombUser,
@@ -811,6 +859,7 @@ const router = useRouter();
 const message = useMessage();
 const dialog = useDialog();
 const tokenStore = useTokenStore();
+const authStore = useAuthStore();
 
 // 限流等待状态
 const rateLimitWaiting = ref(false);
@@ -831,6 +880,7 @@ const importMethodOptions = [
   { label: "手机号验证码", value: "mobile" },
   { label: "BIN多角色获取", value: "bin" },
   { label: "BIN单角色获取", value: "singlebin" },
+  { label: "同步码导入", value: "syncCode" },
 ];
 /** 窄屏用下拉代替 6 个页签 */
 const isMobile = ref(false);
@@ -843,6 +893,39 @@ const connectingTokens = ref(new Set());
 const viewMode = ref(localStorage.getItem("tokenViewMode") || "list");
 const dragIndex = ref(null);
 const multiGameSelectedTokenIds = ref(new Set());
+/** 修改密码弹窗 */
+const showChangePassword = ref(false);
+
+const userMenuOptions = [
+  { label: "修改密码", key: "changePassword" },
+  { label: "退出登录", key: "logout" },
+];
+
+const handleUserAction = async (key) => {
+  if (key === "changePassword") {
+    showChangePassword.value = true;
+    return;
+  }
+  if (key === "logout") {
+    await authStore.logout();
+    router.replace("/login");
+  }
+};
+
+/** 跨端同步码弹窗 */
+const showSyncModal = ref(false);
+const syncModalTab = ref("create");
+/** 打开同步码弹窗：create 生成 / import 导入 */
+const openSyncModal = (tab = "create") => {
+  syncModalTab.value = tab;
+  showSyncModal.value = true;
+};
+/** 只同步列表里勾选的账号 */
+const syncSelectedTokens = computed(() =>
+  tokenStore.gameTokens.filter((t) =>
+    multiGameSelectedTokenIds.value.has(t.id),
+  ),
+);
 const isOpeningMultiGame = ref(false);
 
 // 备注编辑状态管理
@@ -1113,11 +1196,27 @@ const refreshToken = async (token) => {
       token.importMethod === "bin" ||
       token.importMethod === "mobile"
     ) {
-      let userToken = await getArrayBuffer(token.id);
+      let userToken = await getArrayBuffer(token.id, { silent: true });
       let usedOldKey = false;
       if (!userToken) {
-        userToken = await getArrayBuffer(token.name);
+        userToken = await getArrayBuffer(token.name, { silent: true });
         usedOldKey = true;
+      }
+      if (!userToken && token.bin) {
+        // 配置文件里带着 BIN（导出时已内嵌），直接用它恢复
+        try {
+          userToken = base64ToBuffer(token.bin);
+          usedOldKey = false;
+        } catch {
+          userToken = null;
+        }
+      }
+      if (!userToken) {
+        // 通过批量配置 / 同步码导入且文件里没带 BIN 的账号，没法重新生成 token
+        message.warning(
+          `「${token.name}」缺少本地 BIN 数据，无法刷新。请用「BIN 获取」或「微信扫码获取」重新导入该账号。`,
+        );
+        return;
       }
       if (userToken) {
         const newToken = await transformToken(userToken);
@@ -1416,13 +1515,10 @@ const saveEdit = async () => {
   }
 };
 
-const copyToken = async (token) => {
-  try {
-    await navigator.clipboard.writeText(token.token);
-    message.success("Token已复制到剪贴板");
-  } catch (error) {
-    message.error("复制失败");
-  }
+const copyToken = async (token, evt) => {
+  const ok = await copyText(token.token, { anchor: evt?.currentTarget });
+  if (ok) message.success("Token已复制到剪贴板");
+  else message.warning("浏览器阻止了自动复制，请用「编辑」查看并手动复制");
 };
 
 const downloadTokenBin = async (token) => {
@@ -1609,9 +1705,14 @@ const handleBulkAction = (key) => {
   }
 };
 
-const exportTokens = () => {
+const exportTokens = async () => {
   try {
-    const data = tokenStore.exportTokens();
+    // 把 IndexedDB 里的 BIN 一起打进去，否则换设备导入后点「刷新」会提示缺少 BIN
+    const tokensWithBins = await attachTokenBins(tokenStore.gameTokens);
+    const data = {
+      ...tokenStore.exportTokens(),
+      tokens: tokensWithBins,
+    };
     const dataStr = JSON.stringify(data, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
 
@@ -1619,9 +1720,16 @@ const exportTokens = () => {
     link.href = URL.createObjectURL(dataBlob);
     link.download = `tokens_backup_${new Date().toISOString().split("T")[0]}.json`;
     link.click();
+    URL.revokeObjectURL(link.href);
 
-    message.success("Token数据已导出");
+    const binCount = tokensWithBins.filter((t) => t.bin).length;
+    message.success(
+      binCount
+        ? `Token数据已导出（${tokensWithBins.length} 个账号，含 ${binCount} 份 BIN）`
+        : `Token数据已导出（${tokensWithBins.length} 个账号）`,
+    );
   } catch (error) {
+    console.error("导出失败:", error);
     message.error("导出失败");
   }
 };
@@ -1634,16 +1742,27 @@ const importTokenFile = () => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = JSON.parse(e.target.result);
-          const result = tokenStore.importTokens(data);
+          const list = Array.isArray(data.tokens) ? data.tokens : [];
+          // 先把文件里的 BIN 写回 IndexedDB，再导入账号（bin 字段不留在 localStorage）
+          const restored = await restoreTokenBins(list);
+          const result = tokenStore.importTokens({
+            ...data,
+            tokens: stripTokenBins(list),
+          });
           if (result.success) {
-            message.success(result.message);
+            message.success(
+              restored.restored
+                ? `${result.message}（已恢复 ${restored.restored} 份 BIN）`
+                : result.message,
+            );
           } else {
             message.error(result.message);
           }
         } catch (error) {
+          console.error("导入 Token 文件失败:", error);
           message.error("文件格式错误");
         }
       };
@@ -1658,8 +1777,14 @@ const importTokenFile = () => {
 //  2. Batch-daily export  { version, tokens, scheduledTasks, ... }
 //  3. Plain token export  { tokens: [...] }
 const handleImportConfigFile = ({ file }) => {
+  // 兼容原生 File 与 naive UploadFile（后者包了一层 .file）
+  const rawFile = file?.file ?? file;
+  if (!rawFile) {
+    message.error("没有读取到文件");
+    return;
+  }
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     let data;
     try {
       data = JSON.parse(e.target.result);
@@ -1694,9 +1819,17 @@ const handleImportConfigFile = ({ file }) => {
 
     // 3. Plain token export format.
     if (Array.isArray(data.tokens)) {
-      const result = tokenStore.importTokens(data);
+      const imported = await restoreTokenBins(data.tokens);
+      const result = tokenStore.importTokens({
+        ...data,
+        tokens: stripTokenBins(data.tokens),
+      });
       if (result.success) {
-        message.success(result.message);
+        message.success(
+          imported.restored
+            ? `${result.message}（已恢复 ${imported.restored} 份 BIN）`
+            : result.message,
+        );
       } else {
         message.error(result.message);
       }
@@ -1705,7 +1838,7 @@ const handleImportConfigFile = ({ file }) => {
 
     message.error("无法识别的配置文件格式");
   };
-  reader.readAsText(file.file);
+  reader.readAsText(rawFile);
 };
 
 // Restore a full backup; reload afterwards so all stores re-read fresh data.
@@ -1729,10 +1862,13 @@ const runFullBackupRestore = async (data, mode) => {
 
 // Import a batch-daily config export: tokens, scheduled tasks, batch settings
 // and per-account daily settings. Existing entries are skipped (add-only).
-const importBatchConfig = (data) => {
+const importBatchConfig = async (data) => {
   try {
     let importedTokens = 0;
     let importedTasks = 0;
+
+    // 文件里如果带了 BIN，先写回 IndexedDB，否则导入后无法刷新
+    const binStat = await restoreTokenBins(data.tokens);
 
     data.tokens.forEach((token) => {
       const exists = tokenStore.gameTokens.some(
@@ -1750,6 +1886,12 @@ const importBatchConfig = (data) => {
           remark: token.remark || "",
           importMethod: token.importMethod || "import",
           sourceUrl: token.sourceUrl || null,
+          // 这几个是「刷新 token」要用的，少一个就只能重新导入
+          combUser: token.combUser || null,
+          serverId: token.serverId ?? null,
+          roleId: token.roleId ?? null,
+          roleIndex: token.roleIndex ?? null,
+          avatar: token.avatar || "",
           upgradedToPermanent: true,
           upgradedAt: token.upgradedAt || null,
           updatedAt: token.updatedAt || new Date().toISOString(),
@@ -1791,6 +1933,8 @@ const importBatchConfig = (data) => {
 
     message.success(
       `导入成功：${importedTokens} 个新账号，${importedTasks} 个新定时任务${
+        binStat.restored ? `，已恢复 ${binStat.restored} 份 BIN` : ""
+      }${
         data.tokenSettings?.length
           ? `，${data.tokenSettings.length} 份账号设置`
           : ""
@@ -2236,6 +2380,55 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 页头右侧：主题切换 + 用户菜单，两者一起贴右 */
+.header-user {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .theme-toggle {
+    position: static;
+    right: auto;
+  }
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 42vw;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.user-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 窄屏：右下角这组（主题 + 用户）不能把居中的 logo 挤到，只留头像 */
+@media (max-width: 520px) {
+  .user-name,
+  .user-info .n-icon {
+    display: none;
+  }
+
+  .user-info {
+    padding: 4px;
+    gap: 0;
+    max-width: none;
+  }
 }
 
 .brand-logo {

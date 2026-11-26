@@ -141,3 +141,6 @@ render-backend/logs/
 
 # Windows 保留名文件（bash 里误写 >nul 重定向会生成）
 nul
+
+# 同步码临时存储（运行时生成，含加密后的 token）
+render-backend/data/

@@ -113,6 +113,35 @@ export function verifyPassword(user, password) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
+/**
+ * 用户自助修改密码：必须校验原密码。
+ * 成功后 tokenEpoch +1，让所有设备上的旧 token 失效。
+ * @param {string} username 用户名
+ * @param {string} oldPassword 当前密码
+ * @param {string} newPassword 新密码
+ * @returns {object} 脱敏后的用户对象
+ */
+export function changePassword(username, oldPassword, newPassword) {
+  const store = load();
+  const user = store.users.find((u) => u.username === String(username || "").trim());
+  if (!user) throw new Error("用户不存在");
+  if (!verifyPassword(user, String(oldPassword || ""))) {
+    throw new Error("当前密码不正确");
+  }
+  const pwd = String(newPassword || "");
+  if (pwd.length < 8) throw new Error("新密码至少 8 位");
+  if (pwd === String(oldPassword || "")) {
+    throw new Error("新密码不能与当前密码相同");
+  }
+
+  user.salt = crypto.randomBytes(16).toString("hex");
+  user.passHash = hashPassword(pwd, user.salt);
+  user.tokenEpoch = Number(user.tokenEpoch || 0) + 1;
+  user.passwordChangedAt = new Date().toISOString();
+  save(store);
+  return publicUser(user);
+}
+
 /** 对外返回时去掉哈希与 salt */
 export function publicUser(user) {
   if (!user) return null;

@@ -14,6 +14,7 @@ import cron from "node-cron";
 import { createApiKeyMiddleware } from "./lib/apiKeyAuth.js";
 import { listAuthLogDates, logAuth, readAuthLogs } from "./lib/authLog.js";
 import {
+  changePassword,
   createUser,
   deleteUser,
   findUser,
@@ -27,6 +28,12 @@ import {
 import { clientIp, readUserToken, signToken, verifyToken } from "./lib/authToken.js";
 import { GameClient } from "./lib/gameClient.js";
 import { PushingRunner } from "./lib/pushingRunner.js";
+import {
+  createSyncCode,
+  peekSyncCode,
+  redeemSyncCode,
+  SyncError,
+} from "./lib/syncStore.js";
 
 dotenv.config();
 
@@ -39,6 +46,9 @@ function sleep(ms) {
 
 const app = express();
 app.use(cors());
+// 同步码请求会带 BIN（base64，单账号可达数十 KB，100 个账号就上 MB），
+// 必须排在全局 1mb 解析器之前单独放宽，否则创建同步码直接 413。
+app.use("/api/sync", express.json({ limit: "8mb" }));
 // 前端埋点会上报 WS 报文（base64 后单条可达数十 KB），默认 100kb 会直接 413，
 // 这里放宽到 1mb；路由内部仍按 FRONTEND_LOG_MAX_BATCH 限制条数。
 app.use(express.json({ limit: "1mb" }));
@@ -607,6 +617,10 @@ function requireUser(req, res, next) {
   if (isExpired(user)) {
     return res.status(403).json({ error: "账号已过期，请联系管理员续期" });
   }
+  // 改过密码后 epoch 会 +1，旧 token 立刻失效
+  if ((payload.epoch ?? 0) !== Number(user.tokenEpoch || 0)) {
+    return res.status(401).json({ error: "登录状态已失效，请重新登录" });
+  }
   req.authUser = publicUser(user);
   next();
 }
@@ -654,7 +668,11 @@ app.post("/auth/login", (req, res) => {
       .json({ error: `账号已于 ${until} 过期，请联系管理员续期` });
   }
 
-  const token = signToken({ username: user.username, role: user.role });
+  const token = signToken({
+    username: user.username,
+    role: user.role,
+    epoch: Number(user.tokenEpoch || 0),
+  });
   touchLogin(user.username, ip);
   logAuth({ action: "login", username: user.username, ip, ua, ok: true });
   res.json({ token, user: publicUser(user) });
@@ -662,6 +680,32 @@ app.post("/auth/login", (req, res) => {
 
 app.get("/auth/me", requireUser, (req, res) => {
   res.json({ user: req.authUser });
+});
+
+// 自助修改密码：普通用户也允许；校验原密码，成功后旧 token 全部失效
+app.post("/auth/change-password", requireUser, (req, res) => {
+  const { oldPassword, newPassword } = req.body || {};
+  try {
+    changePassword(req.authUser.username, oldPassword, newPassword);
+    logAuth({
+      action: "password_change",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ua: req.header("user-agent") || "",
+      ok: true,
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    logAuth({
+      action: "password_change",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ua: req.header("user-agent") || "",
+      ok: false,
+      reason: error.message,
+    });
+    res.status(400).json({ error: error.message });
+  }
 });
 
 app.post("/auth/logout", requireUser, (req, res) => {
@@ -734,6 +778,60 @@ app.get("/auth/logs", requireUser, requireAdmin, (req, res) => {
     dates: listAuthLogDates(),
     logs: readAuthLogs({ date: date || undefined, limit }),
   });
+});
+
+// ==================== 跨端同步码 ====================
+// 放在 apiKey 中间件之前：前端只带 x-user-token，不带 x-api-key。
+// token 只在服务器内存/加密文件里短暂停留（默认 10 分钟、一次性）。
+function handleSyncError(res, error) {
+  if (error instanceof SyncError) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  console.error("[sync]", error);
+  return res.status(500).json({ error: "同步服务异常" });
+}
+
+app.post("/api/sync/create", requireUser, (req, res) => {
+  try {
+    const result = createSyncCode(req.authUser.username, req.body?.tokens);
+    logAuth({
+      action: "sync_create",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ok: true,
+      reason: `${result.count} 个账号`,
+    });
+    res.json(result);
+  } catch (error) {
+    handleSyncError(res, error);
+  }
+});
+
+app.get("/api/sync/info", requireUser, (req, res) => {
+  try {
+    res.json(peekSyncCode(req.query.code, req.authUser.username));
+  } catch (error) {
+    handleSyncError(res, error);
+  }
+});
+
+app.post("/api/sync/redeem", requireUser, (req, res) => {
+  try {
+    const { tokens } = redeemSyncCode(
+      req.body?.code,
+      req.authUser.username,
+    );
+    logAuth({
+      action: "sync_redeem",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ok: true,
+      reason: `${tokens.length} 个账号`,
+    });
+    res.json({ tokens });
+  } catch (error) {
+    handleSyncError(res, error);
+  }
 });
 
 app.use("/api", createApiKeyMiddleware());
@@ -953,8 +1051,10 @@ app.get("/api/pushing/logs", (req, res) => {
 
 // 本地默认 3001：3000 被 Vite dev server 占用（见 vite.config.js）
 const PORT = process.env.PORT || 3001;
+// HOST 默认 0.0.0.0（本地开发直连）；生产由 nginx 反代，设为 127.0.0.1 不对外暴露
+const HOST = process.env.HOST || "0.0.0.0";
 init().then(() => {
-  app.listen(PORT, () => {
-    addLog("INFO", "server", `监听端口 ${PORT}`);
+  app.listen(PORT, HOST, () => {
+    addLog("INFO", "server", `监听 ${HOST}:${PORT}`);
   });
 });

@@ -3190,8 +3190,9 @@ import {
 } from "@/utils/batch/blackMarketConfig";
 import { DailyTaskRunner } from "@/utils/dailyTaskRunner";
 import { goldItemsConfig, merchantConfig } from "@/utils/dreamConstants";
-
 import { isSameGameValue } from "@/utils/gameValue.js";
+
+import { attachTokenBins, restoreTokenBins } from "@/utils/tokenBinBackup";
 
 import { DEFAULT_WEIRD_TOWER_MAX_CLIMB } from "@/utils/towerClimbLimit.js";
 
@@ -4250,7 +4251,7 @@ const deselectAllTasks = () => {
 // ======================
 
 // Export all tokens and scheduled tasks configuration
-const exportConfig = () => {
+const exportConfig = async () => {
   try {
     // Get all valid token IDs
     const validTokenIds = new Set(tokens.value.map((t) => t.id));
@@ -4282,10 +4283,10 @@ const exportConfig = () => {
       }
     });
 
-    const exportData = {
-      version: "1.1",
-      exportTime: new Date().toISOString(),
-      tokens: tokens.value.map((t) => ({
+    // 带上 combUser / 角色信息（刷新 token 要用），并把 IndexedDB 里的 BIN 内嵌进来，
+    // 这样换设备导入后还能直接刷新，不必重新扫码/BIN 获取
+    const tokensWithBins = await attachTokenBins(
+      tokens.value.map((t) => ({
         id: t.id,
         name: t.name,
         token: t.token,
@@ -4294,10 +4295,21 @@ const exportConfig = () => {
         remark: t.remark,
         importMethod: t.importMethod,
         sourceUrl: t.sourceUrl,
+        combUser: t.combUser || null,
+        serverId: t.serverId ?? null,
+        roleId: t.roleId ?? null,
+        roleIndex: t.roleIndex ?? null,
+        avatar: t.avatar || "",
         upgradedToPermanent: true,
         upgradedAt: t.upgradedAt,
         updatedAt: t.updatedAt,
       })),
+    );
+
+    const exportData = {
+      version: "1.1",
+      exportTime: new Date().toISOString(),
+      tokens: tokensWithBins,
       scheduledTasks: filteredScheduledTasks,
       batchSettings: {
         boxCount: batchSettings.boxCount,
@@ -4330,8 +4342,11 @@ const exportConfig = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
+    const binCount = tokensWithBins.filter((t) => t.bin).length;
     message.success(
-      `导出成功: ${exportData.tokens.length} 个账号, ${exportData.scheduledTasks.length} 个定时任务`,
+      `导出成功: ${exportData.tokens.length} 个账号${
+        binCount ? `（含 ${binCount} 份 BIN）` : ""
+      }, ${exportData.scheduledTasks.length} 个定时任务`,
     );
   } catch (error) {
     console.error("Export failed:", error);
@@ -4362,6 +4377,12 @@ const onConfigFileChange = async (event) => {
 
 const importConfig = async ({ file }) => {
   try {
+    // 触发来源有两个：隐藏 input 给的是原生 File，n-upload 给的是 UploadFile（包了 .file）
+    const rawFile = file?.file ?? file;
+    if (!rawFile) {
+      message.error("没有读取到文件");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -4382,6 +4403,9 @@ const importConfig = async ({ file }) => {
 
         // Import tokens
         if (Array.isArray(importData.tokens)) {
+          // 先把文件里内嵌的 BIN 写回 IndexedDB，否则导入后点「刷新」会提示缺少 BIN
+          restoreTokenBins(importData.tokens).catch(() => {});
+
           importData.tokens.forEach((token) => {
             // Check if token already exists
             const exists = gameTokens.value.some(
@@ -4398,8 +4422,15 @@ const importConfig = async ({ file }) => {
                 server: token.server || "",
                 wsUrl: token.wsUrl || null,
                 remark: token.remark || "",
-                importMethod: "import",
+                // 保留原始导入方式，刷新时要按它选分支
+                importMethod: token.importMethod || "import",
                 sourceUrl: token.sourceUrl || null,
+                // 刷新 token 需要的字段
+                combUser: token.combUser || null,
+                serverId: token.serverId ?? null,
+                roleId: token.roleId ?? null,
+                roleIndex: token.roleIndex ?? null,
+                avatar: token.avatar || "",
                 upgradedToPermanent: true,
                 upgradedAt: token.upgradedAt || null,
                 updatedAt: token.updatedAt || new Date().toISOString(),
@@ -4456,7 +4487,7 @@ const importConfig = async ({ file }) => {
         message.error("解析配置文件失败");
       }
     };
-    reader.readAsText(file.file);
+    reader.readAsText(rawFile);
   } catch (error) {
     console.error("Import failed:", error);
     message.error(`导入失败: ${error.message}`);

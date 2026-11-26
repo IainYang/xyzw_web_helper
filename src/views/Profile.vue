@@ -4,7 +4,8 @@
       <div class="page-header">
         <h1>个人资料</h1>
         <p>管理您的账户信息和偏好设置</p>
-      </div>
+          <ChangePasswordModal v-model:show="showChangePassword" />
+  </div>
 
       <h2>基本信息</h2>
       <a-card>
@@ -36,36 +37,13 @@
 
       <h2>密码修改</h2>
       <a-card>
-        <a-form
-          :model="passwordForm"
-          ref="passwordFormRef"
-          label-placement="left"
-          label-width="100px"
-        >
-          <a-form-item label="当前密码" prop="currentPassword">
-            <a-input
-              v-model:value="passwordForm.currentPassword"
-              type="password"
-              placeholder="请输入当前密码"
-            />
-          </a-form-item>
-          <a-form-item label="新密码" prop="newPassword">
-            <a-input
-              v-model:value="passwordForm.newPassword"
-              type="password"
-              placeholder="请输入新密码"
-            />
-          </a-form-item>
-          <a-form-item label="确认新密码" prop="confirmPassword">
-            <a-input
-              v-model:value="passwordForm.confirmPassword"
-              type="password"
-              placeholder="请再次输入新密码"
-            />
-          </a-form-item>
-        </a-form>
+        <p class="pwd-hint">
+          修改密码需要验证当前密码；修改成功后所有设备都需要用新密码重新登录。
+        </p>
         <template #actions>
-          <a-button type="primary" @click="changePassword"> 修改密码 </a-button>
+          <a-button type="primary" @click="showChangePassword = true">
+            修改密码
+          </a-button>
         </template>
       </a-card>
 
@@ -144,15 +122,13 @@
 <script setup>
 import { useDialog, useMessage } from "naive-ui";
 import { onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import ChangePasswordModal from "@/components/User/ChangePasswordModal.vue";
 import { useAuthStore } from "@/stores/auth";
 import { collectFullBackup, downloadBackupFile } from "@/utils/fullBackup";
 
-useRouter();
 const message = useMessage();
 const dialog = useDialog();
 const authStore = useAuthStore();
-const passwordFormRef = ref(null);
 
 // 用户信息
 const userInfo = reactive({
@@ -163,12 +139,8 @@ const userInfo = reactive({
   avatar: "",
 });
 
-// 密码表单
-const passwordForm = reactive({
-  currentPassword: "",
-  newPassword: "",
-  confirmPassword: "",
-});
+/** 修改密码弹窗 */
+const showChangePassword = ref(false);
 
 // 系统偏好
 const preferences = reactive({
@@ -202,23 +174,7 @@ const saveProfile = async () => {
   }
 };
 
-const changePassword = async () => {
-  if (!passwordFormRef.value) return;
 
-  try {
-    await passwordFormRef.value.validate();
-
-    // 这里应该调用API修改密码
-    message.success("密码修改成功");
-
-    // 清空表单
-    Object.keys(passwordForm).forEach((key) => {
-      passwordForm[key] = "";
-    });
-  } catch (error) {
-    // 验证失败
-  }
-};
 
 const updateTheme = (theme) => {
   preferences.theme = theme;

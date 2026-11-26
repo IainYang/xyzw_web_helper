@@ -18,7 +18,7 @@ function sign(data) {
 
 /**
  * 生成 token。
- * @param {{username: string, role: string}} payload 用户信息
+ * @param {{username: string, role?: string, epoch?: number}} payload 用户信息（epoch 用于改密后作废旧 token）
  * @param {number} [ttlMs] 有效期
  * @returns {string} data.signature
  */
@@ -26,6 +26,8 @@ export function signToken(payload, ttlMs = DEFAULT_TTL) {
   const body = {
     username: payload.username,
     role: payload.role || "user",
+    // 改密时用户上 +1，旧 token 立即失效（否则换了密码，别的设备还能用 7 天）
+    epoch: payload.epoch ?? 0,
     iat: Date.now(),
     exp: Date.now() + ttlMs,
   };

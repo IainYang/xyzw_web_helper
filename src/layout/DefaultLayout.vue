@@ -293,6 +293,8 @@
     <div class="main">
       <router-view />
     </div>
+
+    <ChangePasswordModal v-model:show="showChangePassword" />
   </div>
 </template>
 
@@ -317,6 +319,7 @@ import { ref } from "vue";
 
 import { useRouter } from "vue-router";
 import ThemeToggle from "@/components/Common/ThemeToggle.vue";
+import ChangePasswordModal from "@/components/User/ChangePasswordModal.vue";
 import { useAuthStore } from "@/stores/auth";
 import { selectedToken, useTokenStore } from "@/stores/tokenStore";
 import { isNowInLegionWarTime } from "@/utils/clubBattleUtils";
@@ -327,8 +330,14 @@ const router = useRouter();
 const message = useMessage();
 
 const isMobileMenuOpen = ref(false);
+/** 修改密码弹窗（普通用户也可用） */
+const showChangePassword = ref(false);
 
 const userMenuOptions = [
+  {
+    label: "修改密码",
+    key: "changePassword",
+  },
   {
     label: "清除所有Token并退出",
     key: "logout",
@@ -351,6 +360,9 @@ const onLogout = async () => {
 // 方法
 const handleUserAction = async (key) => {
   switch (key) {
+    case "changePassword":
+      showChangePassword.value = true;
+      break;
     case "logout":
       await tokenStore.clearAllTokens();
       message.success("已清除所有Token");

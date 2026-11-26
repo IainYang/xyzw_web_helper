@@ -156,6 +156,11 @@ export default defineConfig(async () => {
       open: true,
       host: true,
       proxy: {
+        // 跨端同步码：转发到本地 render-backend（只要求登录，不需要 api-key）
+        "/api/sync": {
+          target: "http://127.0.0.1:3001",
+          changeOrigin: true,
+        },
         // 登录 / 白名单管理：转发到本地 render-backend
         "/auth": {
           target: "http://127.0.0.1:3001",
