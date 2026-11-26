@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "username": "yangkaiming",
+      "passHash": "f22db7f33cfbdb49cf74ccfd57de2ba41c592ccdc9924430cfec4ff565a73bc86ec8cb409a4941bd748d08df62ad7c437a22569135d5b6da2ea3a502ff006400",
+      "salt": "93019186ad168ec95d69ceaede9eae31",
+      "role": "admin",
+      "enabled": true,
+      "note": "初始管理员",
+      "createdAt": "2026-11-26T03:16:54.432Z",
+      "lastLoginAt": "2026-11-26T03:19:39.626Z",
+      "lastLoginIp": "::ffff:127.0.0.1"
+    }
+  ]
+}

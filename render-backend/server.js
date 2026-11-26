@@ -12,6 +12,18 @@ import dotenv from "dotenv";
 import express from "express";
 import cron from "node-cron";
 import { createApiKeyMiddleware } from "./lib/apiKeyAuth.js";
+import { listAuthLogDates, logAuth, readAuthLogs } from "./lib/authLog.js";
+import {
+  createUser,
+  deleteUser,
+  findUser,
+  listUsers,
+  publicUser,
+  touchLogin,
+  updateUser,
+  verifyPassword,
+} from "./lib/authStore.js";
+import { clientIp, readUserToken, signToken, verifyToken } from "./lib/authToken.js";
 import { GameClient } from "./lib/gameClient.js";
 import { PushingRunner } from "./lib/pushingRunner.js";
 
@@ -581,7 +593,134 @@ const pushingRunner = new PushingRunner({
   loadTokens,
 });
 
+// ==================== 用户认证（白名单） ====================
+// 默认强制登录；本地调试可设 REQUIRE_LOGIN=0 关掉，方便不登录直接调接口
+const REQUIRE_LOGIN = process.env.REQUIRE_LOGIN !== "0";
+
+function requireUser(req, res, next) {
+  const payload = verifyToken(readUserToken(req));
+  if (!payload) return res.status(401).json({ error: "未登录或登录已过期" });
+  const user = findUser(payload.username);
+  if (!user) return res.status(401).json({ error: "账号不存在" });
+  if (!user.enabled) return res.status(403).json({ error: "账号已被停用" });
+  req.authUser = publicUser(user);
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.authUser?.role !== "admin") {
+    return res.status(403).json({ error: "需要管理员权限" });
+  }
+  next();
+}
+
+app.post("/auth/login", (req, res) => {
+  const { username, password } = req.body || {};
+  const ip = clientIp(req);
+  const ua = req.header("user-agent") || "";
+  const user = findUser(username);
+
+  if (!user || !verifyPassword(user, String(password || ""))) {
+    logAuth({
+      action: "login_fail",
+      username,
+      ip,
+      ua,
+      ok: false,
+      reason: user ? "密码错误" : "用户不存在",
+    });
+    return res.status(401).json({ error: "用户名或密码错误" });
+  }
+  if (!user.enabled) {
+    logAuth({ action: "login_fail", username, ip, ua, ok: false, reason: "账号已停用" });
+    return res.status(403).json({ error: "账号已被停用，请联系管理员" });
+  }
+
+  const token = signToken({ username: user.username, role: user.role });
+  touchLogin(user.username, ip);
+  logAuth({ action: "login", username: user.username, ip, ua, ok: true });
+  res.json({ token, user: publicUser(user) });
+});
+
+app.get("/auth/me", requireUser, (req, res) => {
+  res.json({ user: req.authUser });
+});
+
+app.post("/auth/logout", requireUser, (req, res) => {
+  logAuth({
+    action: "logout",
+    username: req.authUser.username,
+    ip: clientIp(req),
+    ua: req.header("user-agent") || "",
+    ok: true,
+  });
+  res.json({ ok: true });
+});
+
+app.get("/auth/users", requireUser, requireAdmin, (req, res) => {
+  res.json({ users: listUsers() });
+});
+
+app.post("/auth/users", requireUser, requireAdmin, (req, res) => {
+  try {
+    const user = createUser(req.body || {});
+    logAuth({
+      action: "user_create",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ok: true,
+      reason: `创建 ${user.username}`,
+    });
+    res.json({ user });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch("/auth/users/:username", requireUser, requireAdmin, (req, res) => {
+  try {
+    const user = updateUser(req.params.username, req.body || {});
+    logAuth({
+      action: "user_update",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ok: true,
+      reason: `修改 ${user.username}`,
+    });
+    res.json({ user });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/auth/users/:username", requireUser, requireAdmin, (req, res) => {
+  try {
+    deleteUser(req.params.username);
+    logAuth({
+      action: "user_delete",
+      username: req.authUser.username,
+      ip: clientIp(req),
+      ok: true,
+      reason: `删除 ${req.params.username}`,
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/auth/logs", requireUser, requireAdmin, (req, res) => {
+  const date = String(req.query.date || "");
+  const limit = Number(req.query.limit) || 500;
+  res.json({
+    dates: listAuthLogDates(),
+    logs: readAuthLogs({ date: date || undefined, limit }),
+  });
+});
+
 app.use("/api", createApiKeyMiddleware());
+// 业务接口额外要求登录（用户 token 走 x-user-token，不和 API Key 抢 Authorization）
+if (REQUIRE_LOGIN) app.use("/api", requireUser);
 
 // 未配置 Supabase 时（例如本地只想收前端日志），业务接口直接给出明确原因。
 // 不依赖数据库的接口（内存日志、任务定义、前端日志文件）放行。

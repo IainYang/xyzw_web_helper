@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import * as autoRoutes from "vue-router/auto-routes";
+import { useAuthStore } from "@/stores/auth";
 import { useTokenStore } from "@/stores/tokenStore";
 import { isNowInLegionWarTime } from "@/utils/clubBattleUtils";
 
@@ -163,10 +164,24 @@ const my_routes = [
       requiresToken: true,
     },
   },
-  // 兼容旧路由，重定向到新的token管理页面
+  {
+    path: "/admin/users",
+    name: "UserManage",
+    component: () => import("@/views/admin/UserManage.vue"),
+    meta: {
+      title: "用户管理",
+      requiresToken: false,
+    },
+  },
   {
     path: "/login",
-    redirect: "/tokens",
+    name: "Login",
+    component: () => import("@/views/Login.vue"),
+    meta: {
+      title: "登录",
+      requiresToken: false,
+      requiresAuth: false,
+    },
   },
   {
     path: "/register",
@@ -206,11 +221,28 @@ autoRoutes.handleHotUpdate?.(router);
 // 导航守卫
 router.beforeEach((to, from, next) => {
   const tokenStore = useTokenStore();
+  const authStore = useAuthStore();
 
   // 设置页面标题
   document.title = to.meta.title
     ? `${to.meta.title} - XYZW 游戏管理系统`
     : "XYZW 游戏管理系统";
+  // 登录页：已登录直接进后台，未登录放行
+  if (to.path === "/login" || to.meta.requiresAuth === false) {
+    if (to.path === "/login" && authStore.isAuthenticated) {
+      next("/admin/dashboard");
+      return;
+    }
+    next();
+    return;
+  }
+
+  // 其余页面一律要求登录（白名单用户）
+  if (!authStore.isAuthenticated) {
+    next({ path: "/login", query: { redirect: to.fullPath } });
+    return;
+  }
+
   if (to.name === "LegionWar" && !isNowInLegionWarTime()) {
     next("/admin/dashboard");
     return;

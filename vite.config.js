@@ -156,6 +156,11 @@ export default defineConfig(async () => {
       open: true,
       host: true,
       proxy: {
+        // 登录 / 白名单管理：转发到本地 render-backend
+        "/auth": {
+          target: "http://127.0.0.1:3001",
+          changeOrigin: true,
+        },
         // 后台推关：转发到本地 render-backend，x-api-key 自动取 render-backend/.env 的 API_KEY
         "/api/pushing": {
           target: "http://127.0.0.1:3001",

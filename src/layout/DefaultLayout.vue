@@ -92,6 +92,17 @@
             <span>备份恢复</span>
           </router-link>
           <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/users"
+            class="nav-item"
+            active-class="active"
+          >
+            <n-icon>
+              <People />
+            </n-icon>
+            <span>用户管理</span>
+          </router-link>
+          <router-link
             to="/admin/legion-war"
             class="nav-item"
             active-class="active"
@@ -262,6 +273,7 @@ import {
   Layers,
   LockOpen,
   Menu,
+  People,
   PersonCircle,
   Settings,
 } from "@vicons/ionicons5";
@@ -270,10 +282,12 @@ import { ref } from "vue";
 
 import { useRouter } from "vue-router";
 import ThemeToggle from "@/components/Common/ThemeToggle.vue";
+import { useAuthStore } from "@/stores/auth";
 import { selectedToken, useTokenStore } from "@/stores/tokenStore";
 import { isNowInLegionWarTime } from "@/utils/clubBattleUtils";
 
 const tokenStore = useTokenStore();
+const authStore = useAuthStore();
 const router = useRouter();
 const message = useMessage();
 
