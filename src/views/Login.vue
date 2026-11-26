@@ -53,11 +53,7 @@
               <n-checkbox v-model:checked="loginForm.rememberMe">
                 记住我
               </n-checkbox>
-              <n-button
-                text
-                type="primary"
-                @click="router.push('/forgot-password')"
-              >
+              <n-button text type="primary" @click="onForgotPassword">
                 忘记密码？
               </n-button>
             </div>
@@ -74,44 +70,6 @@
             </n-button>
           </n-form>
 
-          <n-divider>
-            <span class="divider-text">其他登录方式</span>
-          </n-divider>
-
-          <div class="social-login">
-            <n-button
-              size="large"
-              class="social-button"
-              @click="handleSocialLogin('qq')"
-            >
-              <template #icon>
-                <n-icon>
-                  <PersonCircle />
-                </n-icon>
-              </template>
-              QQ登录
-            </n-button>
-
-            <n-button
-              size="large"
-              class="social-button"
-              @click="handleSocialLogin('wechat')"
-            >
-              <template #icon>
-                <n-icon>
-                  <PersonCircle />
-                </n-icon>
-              </template>
-              微信登录
-            </n-button>
-          </div>
-
-          <div class="register-prompt">
-            <span>还没有账户？</span>
-            <n-button text type="primary" @click="router.push('/register')">
-              立即注册
-            </n-button>
-          </div>
         </div>
       </div>
 
@@ -151,13 +109,14 @@
 
 <script setup>
 import { Cube, PersonCircle, Ribbon, Settings } from "@vicons/ionicons5";
-import { useMessage } from "naive-ui";
+import { useDialog, useMessage } from "naive-ui";
 import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 
 const router = useRouter();
 const message = useMessage();
+const dialog = useDialog();
 const authStore = useAuthStore();
 const loginFormRef = ref(null);
 
@@ -248,10 +207,14 @@ const handleLogin = async () => {
   }
 };
 
-// 处理社交登录
-const handleSocialLogin = (provider) => {
-  message.info(`${provider === "qq" ? "QQ" : "微信"}登录功能开发中...`);
-};
+/** 忘记密码：没有自助找回入口，引导联系管理员 */
+function onForgotPassword() {
+  dialog.info({
+    title: "找回密码",
+    content: "账号密码由管理员统一维护，请联系管理员重置。",
+    positiveText: "知道了",
+  });
+}
 
 onMounted(() => {
   // 如果已经登录，直接跳转
@@ -545,8 +508,9 @@ onMounted(() => {
 @media (max-width: 640px) {
   .login-page {
     padding: 16px;
-    align-items: flex-start;
-    padding-top: max(8vh, env(safe-area-inset-top));
+    align-items: center;
+    padding-top: max(3vh, env(safe-area-inset-top));
+    padding-bottom: max(3vh, env(safe-area-inset-bottom));
   }
 
   .login-container {
@@ -556,8 +520,36 @@ onMounted(() => {
   }
 
   .login-card {
-    padding: 24px 20px;
+    padding: 22px 18px;
     border-radius: 16px;
+  }
+
+  /* 一屏内放下：图标、标题、间距整体收紧 */
+  .brand-logo {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 8px;
+  }
+
+  .welcome-text {
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+
+  .card-header {
+    margin-bottom: 12px;
+  }
+
+  :deep(.n-form-item) {
+    margin-bottom: 6px;
+  }
+
+  .form-options {
+    margin: 2px 0 14px;
+  }
+
+  .login-button {
+    margin-top: 2px;
   }
 
   .brand-title {
