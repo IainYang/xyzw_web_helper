@@ -243,6 +243,12 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
+  // 后台推关只给管理员（菜单已隐藏，这里拦住直接输网址的情况）
+  if (to.name === "PushingLevels" && !authStore.isAdmin) {
+    next("/admin/dashboard");
+    return;
+  }
+
   if (to.name === "LegionWar" && !isNowInLegionWarTime()) {
     next("/admin/dashboard");
     return;

@@ -51,6 +51,7 @@
             <span>批量日常</span>
           </router-link>
           <router-link
+            v-if="authStore.isAdmin"
             to="/admin/PushingLevels"
             class="nav-item"
             active-class="active"
@@ -194,6 +195,7 @@
           <span>批量日常</span>
         </router-link>
         <router-link
+          v-if="authStore.isAdmin"
           to="/admin/PushingLevels"
           class="drawer-item"
           @click="isMobileMenuOpen = false"

@@ -882,6 +882,9 @@ app.get("/api/task-definitions", (req, res) => {
 // ============ 后台推关 ============
 
 /** 开始推关：{ tokenIds: [], options: { maxRetries, maxLevel, maxConsecutiveErrors } } */
+// 后台推关会常驻在服务器上跑，只对管理员开放；普通用户走浏览器端前端操作
+app.use("/api/pushing", requireAdmin);
+
 app.post("/api/pushing/start", async (req, res) => {
   const { tokenIds, tokens, options } = req.body || {};
   const hasIds = Array.isArray(tokenIds) && tokenIds.length > 0;
