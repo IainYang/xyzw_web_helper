@@ -60,6 +60,15 @@ const my_routes = [
     component: () => import("@/layout/DefaultLayout.vue"),
     children: [
       {
+        path: "users",
+        name: "UserManage",
+        component: () => import("@/views/admin/UserManage.vue"),
+        meta: {
+          title: "用户管理",
+          requiresToken: false,
+        },
+      },
+      {
         path: "dashboard",
         name: "Dashboard",
         component: () => import("@/views/Dashboard.vue"),
@@ -162,15 +171,6 @@ const my_routes = [
     meta: {
       title: "WebSocket测试",
       requiresToken: true,
-    },
-  },
-  {
-    path: "/admin/users",
-    name: "UserManage",
-    component: () => import("@/views/admin/UserManage.vue"),
-    meta: {
-      title: "用户管理",
-      requiresToken: false,
     },
   },
   {

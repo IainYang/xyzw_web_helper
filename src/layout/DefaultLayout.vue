@@ -114,6 +114,17 @@
             </n-icon>
             <span>实时盐场</span>
           </router-link>
+          <button
+            type="button"
+            class="nav-item nav-logout"
+            :title="`当前账号：${authStore.user?.username || ''}`"
+            @click="onLogout"
+          >
+            <n-icon>
+              <LogOut />
+            </n-icon>
+            <span>退出登录</span>
+          </button>
         </div>
 
         <div class="nav-user">
@@ -274,6 +285,7 @@ import {
   Home,
   Layers,
   LockOpen,
+  LogOut,
   Menu,
   People,
   PersonCircle,
@@ -301,6 +313,13 @@ const userMenuOptions = [
     key: "logout",
   },
 ];
+
+/** 退出登录：清登录态并回登录页 */
+const onLogout = async () => {
+  await authStore.logout();
+  message.success("已退出登录");
+  router.replace("/login");
+};
 
 // 方法
 const handleUserAction = async (key) => {
@@ -378,6 +397,19 @@ const handleUserAction = async (key) => {
 
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+.nav-item.nav-logout {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-secondary);
+
+  &:hover {
+    color: #e5484d;
+    background: rgb(229 72 77 / 8%);
   }
 }
 
