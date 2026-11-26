@@ -116,22 +116,6 @@
               </template>
               设置
             </n-button>
-            <n-button
-              type="warning"
-              size="medium"
-              :disabled="isRunning || routineRunning || selectedTokens.length === 0"
-              @click="runDailyFix"
-            >
-              {{ routineRunning ? "执行中..." : "一键补差" }}
-            </n-button>
-            <n-button
-              type="success"
-              size="medium"
-              :disabled="isRunning || routineRunning || selectedTokens.length === 0"
-              @click="runDailyRoutine"
-            >
-              {{ routineRunning ? "执行中..." : "一键日常任务" }}
-            </n-button>
           </div>
         </div>
 
@@ -6442,93 +6426,6 @@ const startBatch = async () => {
   )
     message.warning("本轮结束，仍有未完成任务，可再次开始继续");
   else message.success("批量任务执行结束");
-};
-
-/**
- * 一键补差：复用「开始执行」的 DailyTaskRunner，
- * 对勾选账号按服务器当前任务状态补齐日常任务。
- */
-const runDailyFix = async () => {
-  if (isRunning.value || routineRunning.value) {
-    message.warning("正在执行中，请稍后再试");
-    return;
-  }
-  if (selectedTokens.value.length === 0) {
-    message.warning("请先勾选账号");
-    return;
-  }
-  await startBatch();
-};
-
-/**
- * 一键日常任务：按「日常」分组依次执行全部批量任务。
- *
- * 各任务函数内部自己管理 isRunning 和连接，所以这里只用 routineRunning
- * 防重复点击，不设置 isRunning（否则会把任务函数自己挡掉）。
- */
-const runDailyRoutine = async () => {
-  if (isRunning.value || routineRunning.value) {
-    message.warning("正在执行中，请稍后再试");
-    return;
-  }
-  if (selectedTokens.value.length === 0) {
-    message.warning("请先勾选账号");
-    return;
-  }
-
-  const dailyGroup = taskGroupDefinitions.find((g) => g.name === "daily");
-  const taskNames = (dailyGroup?.tasks ?? []).filter(
-    (name) => typeof getScheduledTask(name) === "function",
-  );
-  if (!taskNames.length) {
-    message.warning("「日常」分组下没有可执行的任务");
-    return;
-  }
-
-  const labelOf = (name) =>
-    availableTasks.find((t) => t.value === name)?.label || name;
-
-  routineRunning.value = true;
-  shouldStop.value = false;
-  addLog({
-    time: new Date().toLocaleTimeString(),
-    message: `=== 一键日常任务开始：共 ${taskNames.length} 项 ===`,
-    type: "info",
-  });
-
-  try {
-    for (const name of taskNames) {
-      if (shouldStop.value) {
-        addLog({
-          time: new Date().toLocaleTimeString(),
-          message: "=== 一键日常任务已停止 ===",
-          type: "warning",
-        });
-        break;
-      }
-      addLog({
-        time: new Date().toLocaleTimeString(),
-        message: `--- ${labelOf(name)} ---`,
-        type: "info",
-      });
-      try {
-        await getScheduledTask(name)();
-      } catch (error) {
-        addLog({
-          time: new Date().toLocaleTimeString(),
-          message: `${labelOf(name)} 执行失败：${error?.message ?? error}`,
-          type: "error",
-        });
-      }
-    }
-  } finally {
-    routineRunning.value = false;
-    addLog({
-      time: new Date().toLocaleTimeString(),
-      message: "=== 一键日常任务结束 ===",
-      type: "success",
-    });
-  }
 };
 
 const stopBatch = () => {
