@@ -40,7 +40,16 @@
         </template>
         <div class="card-header">
           <!-- 导入方式选择 -->
+          <!-- 移动端给下拉：6 个页签在窄屏无论换行还是滚动都不好用 -->
+          <n-select
+            v-if="isMobile"
+            v-model:value="importMethod"
+            class="import-method-select"
+            size="medium"
+            :options="importMethodOptions"
+          />
           <n-radio-group
+            v-else
             v-model:value="importMethod"
             class="import-method-tabs"
             size="small"
@@ -815,6 +824,19 @@ const showEditModal = ref(false);
 const editFormRef = ref(null);
 const editingToken = ref(null);
 const importMethod = ref("manual");
+const importMethodOptions = [
+  { label: "手动输入", value: "manual" },
+  { label: "URL获取", value: "url" },
+  { label: "微信扫码获取", value: "wxQrcode" },
+  { label: "手机号验证码", value: "mobile" },
+  { label: "BIN多角色获取", value: "bin" },
+  { label: "BIN单角色获取", value: "singlebin" },
+];
+/** 窄屏用下拉代替 6 个页签 */
+const isMobile = ref(false);
+const updateIsMobile = () => {
+  isMobile.value = window.innerWidth <= 768;
+};
 const refreshingTokens = ref(new Set());
 const connectingTokens = ref(new Set());
 // 从localStorage读取上次的视图模式，默认为列表视图
@@ -2138,6 +2160,14 @@ const handleRateLimitWaiting = (data) => {
 };
 
 // 生命周期
+updateIsMobile();
+onMounted(() => {
+  window.addEventListener("resize", updateIsMobile);
+});
+onUnmounted(() => {
+  window.removeEventListener("resize", updateIsMobile);
+});
+
 onMounted(async () => {
   tokenStore.initTokenStore();
 
@@ -2829,7 +2859,44 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .container {
-    padding: 0 var(--spacing-md);
+    padding: 0 12px;
+  }
+
+  /* arco 弹窗默认 width="52rem"（832px），手机上会横向溢出，这里强制贴合视口 */
+  :global(.token-import-modal .arco-modal) {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px);
+    top: 12px;
+    margin: 0 auto;
+  }
+
+  :global(.token-import-modal .arco-modal-body) {
+    padding: 16px 14px;
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+  }
+
+  :global(.token-import-modal .arco-modal-header) {
+    padding: 12px 14px;
+  }
+
+  .import-method-select {
+    width: 100%;
+    margin-top: 8px;
+    margin-bottom: 14px;
+  }
+
+  .card-header {
+    margin-bottom: 10px;
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .header-top .brand-logo {
+    width: 42px;
+    height: 42px;
   }
 
   .tokens-grid {
