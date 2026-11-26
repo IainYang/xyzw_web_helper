@@ -267,6 +267,27 @@
           </n-icon>
           <span>个人设置</span>
         </router-link>
+        <router-link
+          v-if="authStore.isAdmin"
+          to="/admin/users"
+          class="drawer-item"
+          @click="isMobileMenuOpen = false"
+        >
+          <n-icon>
+            <People />
+          </n-icon>
+          <span>用户管理</span>
+        </router-link>
+        <button
+          type="button"
+          class="drawer-item drawer-logout"
+          @click="handleMobileLogout"
+        >
+          <n-icon>
+            <LogOut />
+          </n-icon>
+          <span>退出登录</span>
+        </button>
       </div>
     </n-drawer>
     <div class="main">
@@ -313,6 +334,12 @@ const userMenuOptions = [
     key: "logout",
   },
 ];
+
+/** 移动端抽屉里的登出：先收起抽屉，再走同一套登出逻辑 */
+const handleMobileLogout = async () => {
+  isMobileMenuOpen.value = false;
+  await onLogout();
+};
 
 /** 退出登录：清登录态并回登录页 */
 const onLogout = async () => {
@@ -510,6 +537,22 @@ const handleUserAction = async (key) => {
 .drawer-item.router-link-active {
   background: var(--primary-color-light);
   color: var(--primary-color);
+}
+
+/* 抽屉里的退出登录用 button，需要抹掉浏览器默认样式 */
+.drawer-logout {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bg-tertiary);
+    color: #e5484d;
+  }
 }
 
 /* 禁用样式：灰化、鼠标禁止、无hover效果 */
