@@ -17,12 +17,21 @@ import { fileURLToPath } from "node:url";
  * }
  *
  * 密码用 scrypt + 每用户独立 salt 存哈希，不存明文。
- * 文件不存在时会自动初始化，并写入 .env 里的 ADMIN_USER / ADMIN_PASSWORD（若有）。
+ * 文件不存在（或里面一个用户都没有）时会自动建一个初始管理员：
+ * - 优先用 .env 的 ADMIN_USER / ADMIN_PASSWORD；
+ * - 都没配就用内置默认值 admin / admin123456（只为让新部署能先进去，
+ *   登录后请立刻在「用户管理」里改掉）。
+ *
+ * 注意：whitelist.json 是运行时数据，已加入 .gitignore，不再进版本库。
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.AUTH_DATA_DIR || path.join(__dirname, "..");
 const USERS_FILE = path.join(DATA_DIR, "whitelist.json");
+
+/** 内置默认初始管理员（可用 .env 覆盖） */
+const DEFAULT_ADMIN_USER = "admin";
+const DEFAULT_ADMIN_PASSWORD = "admin123456";
 
 const SCRYPT_KEYLEN = 64;
 
@@ -48,17 +57,31 @@ function save(store) {
   fs.renameSync(tmp, USERS_FILE);
 }
 
-/** 首次启动时按 .env 的 ADMIN_USER / ADMIN_PASSWORD 建一个管理员 */
+/**
+ * 首次启动（或用户列表为空）时建一个初始管理员。
+ * 账号来源优先级：.env 的 ADMIN_USER / ADMIN_PASSWORD → 内置 admin / admin123456。
+ * @returns {{users: Array}} 初始化后的用户存储
+ */
 function ensureBootstrapUser() {
   const store = load();
   if (store.users.length) return store;
 
-  const username = (process.env.ADMIN_USER || "").trim();
-  const password = process.env.ADMIN_PASSWORD || "";
-  if (!username || !password) return store;
+  const username = (process.env.ADMIN_USER || DEFAULT_ADMIN_USER).trim();
+  const password = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+  const isDefault = password === DEFAULT_ADMIN_PASSWORD;
 
-  store.users.push(buildUser({ username, password, role: "admin", note: "初始管理员" }));
+  store.users.push(
+    buildUser({
+      username,
+      password,
+      role: "admin",
+      note: isDefault ? "初始管理员（默认密码，请尽快修改）" : "初始管理员",
+    }),
+  );
   save(store);
+  console.log(
+    `[auth] 已创建初始管理员 ${username}${isDefault ? ` / ${DEFAULT_ADMIN_PASSWORD}（默认密码，请登录后立即修改）` : ""}`,
+  );
   return store;
 }
 
