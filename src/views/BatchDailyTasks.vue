@@ -48,16 +48,28 @@
                 <n-button size="small" @click="showTasksModal = true">
                   查看定时任务
                 </n-button>
-                <n-button size="small" @click="exportConfig">
-                  导出配置
-                </n-button>
-                <n-upload
-                  :show-file-list="false"
-                  accept=".json"
-                  :custom-request="importConfig"
+                <n-dropdown
+                  :options="configActionOptions"
+                  trigger="click"
+                  @select="handleConfigAction"
                 >
-                  <n-button size="small">导入配置</n-button>
-                </n-upload>
+                  <n-button size="small">
+                    <template #icon>
+                      <n-icon>
+                        <Settings />
+                      </n-icon>
+                    </template>
+                    其他配置
+                  </n-button>
+                </n-dropdown>
+                <!-- 导入用的隐藏文件选择器，由下拉里的「导入配置」触发 -->
+                <input
+                  ref="configFileInput"
+                  type="file"
+                  accept=".json"
+                  style="display: none"
+                  @change="onConfigFileChange"
+                />
               </div>
               <div
                 class="setting-item"
@@ -4328,6 +4340,26 @@ const exportConfig = () => {
 };
 
 // Import tokens and scheduled tasks configuration
+const configActionOptions = [
+  { label: "导出配置", key: "export" },
+  { label: "导入配置", key: "import" },
+];
+const configFileInput = ref(null);
+
+/** 「其他配置」下拉：导出直接执行，导入走隐藏的 file input */
+const handleConfigAction = (key) => {
+  if (key === "export") exportConfig();
+  else if (key === "import") configFileInput.value?.click();
+};
+
+const onConfigFileChange = async (event) => {
+  const file = event.target.files?.[0];
+  // 清空，保证同一个文件再选一次也能触发
+  event.target.value = "";
+  if (!file) return;
+  await importConfig({ file });
+};
+
 const importConfig = async ({ file }) => {
   try {
     const reader = new FileReader();
