@@ -17,6 +17,7 @@ import {
   createUser,
   deleteUser,
   findUser,
+  isExpired,
   listUsers,
   publicUser,
   touchLogin,
@@ -603,6 +604,9 @@ function requireUser(req, res, next) {
   const user = findUser(payload.username);
   if (!user) return res.status(401).json({ error: "账号不存在" });
   if (!user.enabled) return res.status(403).json({ error: "账号已被停用" });
+  if (isExpired(user)) {
+    return res.status(403).json({ error: "账号已过期，请联系管理员续期" });
+  }
   req.authUser = publicUser(user);
   next();
 }
@@ -634,6 +638,20 @@ app.post("/auth/login", (req, res) => {
   if (!user.enabled) {
     logAuth({ action: "login_fail", username, ip, ua, ok: false, reason: "账号已停用" });
     return res.status(403).json({ error: "账号已被停用，请联系管理员" });
+  }
+  if (isExpired(user)) {
+    logAuth({
+      action: "login_fail",
+      username,
+      ip,
+      ua,
+      ok: false,
+      reason: `账号已过期（${user.expireAt}）`,
+    });
+    const until = new Date(user.expireAt).toLocaleDateString("zh-CN");
+    return res
+      .status(403)
+      .json({ error: `账号已于 ${until} 过期，请联系管理员续期` });
   }
 
   const token = signToken({ username: user.username, role: user.role });

@@ -29,6 +29,10 @@
           </div>
           <div class="uc-meta">
             <span v-if="u.note" class="uc-note">{{ u.note }}</span>
+            <span :class="{ 'uc-expired': isUserExpired(u) }">
+              {{ u.expireAt ? `有效期至 ${formatDate(u.expireAt)}` : "永久有效" }}
+              {{ isUserExpired(u) ? "（已过期）" : "" }}
+            </span>
             <span>{{ u.lastLoginAt ? formatTime(u.lastLoginAt) : "从未登录" }}</span>
             <span v-if="u.lastLoginIp">{{ u.lastLoginIp }}</span>
           </div>
@@ -115,6 +119,15 @@
             </n-space>
           </n-radio-group>
         </n-form-item>
+        <n-form-item label="有效期">
+          <n-date-picker
+            v-model:value="form.expireAt"
+            type="date"
+            clearable
+            style="width: 100%"
+            placeholder="留空表示永久有效"
+          />
+        </n-form-item>
         <n-form-item label="备注">
           <n-input v-model:value="form.note" placeholder="例如：同事张三" />
         </n-form-item>
@@ -156,7 +169,31 @@ const form = reactive({
   password: "",
   role: "user",
   note: "",
+  /** 有效期（timestamp，n-date-picker 用），null = 永久 */
+  expireAt: null,
 });
+
+const ONE_YEAR_MS = 365 * 24 * 3600 * 1000;
+
+/** 新建时默认一年 */
+function defaultExpireAt() {
+  const d = new Date(Date.now() + ONE_YEAR_MS);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function isUserExpired(u) {
+  if (!u?.expireAt) return false;
+  return new Date(u.expireAt).getTime() < Date.now();
+}
 
 const logs = ref([]);
 const logLoading = ref(false);
@@ -190,6 +227,20 @@ const columns = [
         { size: "small", type: row.enabled ? "success" : "error" },
         { default: () => (row.enabled ? "启用" : "停用") },
       ),
+  },
+  {
+    title: "有效期",
+    key: "expireAt",
+    width: 130,
+    render: (row) => {
+      if (!row.expireAt) return "永久";
+      const expired = new Date(row.expireAt).getTime() < Date.now();
+      return h(
+        "span",
+        { style: expired ? "color:#e5484d;font-weight:600" : "" },
+        `${formatDate(row.expireAt)}${expired ? " 已过期" : ""}`,
+      );
+    },
   },
   { title: "备注", key: "note", width: 200, ellipsis: { tooltip: true } },
   {
@@ -322,7 +373,13 @@ async function loadLogs() {
 
 function openCreate() {
   editing.value = null;
-  Object.assign(form, { username: "", password: "", role: "user", note: "" });
+  Object.assign(form, {
+    username: "",
+    password: "",
+    role: "user",
+    note: "",
+    expireAt: defaultExpireAt(),
+  });
   modalVisible.value = true;
 }
 
@@ -333,6 +390,7 @@ function openEdit(row) {
     password: "",
     role: row.role,
     note: row.note || "",
+    expireAt: row.expireAt ? new Date(row.expireAt).getTime() : null,
   });
   modalVisible.value = true;
 }
@@ -355,7 +413,11 @@ async function onSave() {
   saving.value = true;
   try {
     if (editing.value) {
-      const patch = { role: form.role, note: form.note };
+      const patch = {
+        role: form.role,
+        note: form.note,
+        expireAt: form.expireAt ? new Date(form.expireAt).toISOString() : null,
+      };
       if (form.password) patch.password = form.password;
       await api(`/auth/users/${encodeURIComponent(editing.value.username)}`, {
         method: "PATCH",
@@ -370,6 +432,7 @@ async function onSave() {
           password: form.password,
           role: form.role,
           note: form.note,
+          expireAt: form.expireAt ? new Date(form.expireAt).toISOString() : null,
         }),
       });
       message.success("已新增");
@@ -584,6 +647,11 @@ onBeforeUnmount(() => {
 
   .uc-note {
     color: #374151;
+  }
+
+  .uc-expired {
+    color: #e5484d;
+    font-weight: 600;
   }
 
   .uc-actions {

@@ -62,7 +62,20 @@ function ensureBootstrapUser() {
   return store;
 }
 
-function buildUser({ username, password, role = "user", note = "" }) {
+/** 默认有效期：一年 */
+const DEFAULT_VALID_DAYS = 365;
+
+function addDays(base, days) {
+  return new Date(base.getTime() + days * 24 * 3600 * 1000).toISOString();
+}
+
+function buildUser({
+  username,
+  password,
+  role = "user",
+  note = "",
+  expireAt,
+}) {
   const salt = crypto.randomBytes(16).toString("hex");
   return {
     username,
@@ -71,10 +84,20 @@ function buildUser({ username, password, role = "user", note = "" }) {
     role,
     enabled: true,
     note,
+    // 不传就默认一年
+    expireAt: expireAt || addDays(new Date(), DEFAULT_VALID_DAYS),
     createdAt: new Date().toISOString(),
     lastLoginAt: null,
     lastLoginIp: null,
   };
+}
+
+/** 是否已过期；没设置 expireAt 视为永久有效 */
+export function isExpired(user) {
+  if (!user?.expireAt) return false;
+  const t = new Date(user.expireAt).getTime();
+  if (!Number.isFinite(t)) return false;
+  return t < Date.now();
 }
 
 export function hashPassword(password, salt) {
@@ -113,7 +136,7 @@ export function hasAnyUser() {
   return load().users.length > 0;
 }
 
-export function createUser({ username, password, role = "user", note = "" }) {
+export function createUser({ username, password, role = "user", note = "", expireAt }) {
   const name = String(username || "").trim();
   if (!name) throw new Error("用户名不能为空");
   if (!/^[\w.@-]{2,32}$/.test(name)) {
@@ -125,7 +148,7 @@ export function createUser({ username, password, role = "user", note = "" }) {
   if (store.users.some((u) => u.username === name)) {
     throw new Error("该用户已存在");
   }
-  const user = buildUser({ username: name, password, role, note });
+  const user = buildUser({ username: name, password, role, note, expireAt });
   store.users.push(user);
   save(store);
   return publicUser(user);
@@ -140,6 +163,15 @@ export function updateUser(username, patch = {}) {
   if (typeof patch.enabled === "boolean") user.enabled = patch.enabled;
   if (typeof patch.note === "string") user.note = patch.note.slice(0, 100);
   if (patch.role === "admin" || patch.role === "user") user.role = patch.role;
+  if (patch.expireAt !== undefined) {
+    if (patch.expireAt === null || patch.expireAt === "") {
+      user.expireAt = null; // 空 = 永久
+    } else {
+      const t = new Date(patch.expireAt).getTime();
+      if (!Number.isFinite(t)) throw new Error("有效期格式不正确");
+      user.expireAt = new Date(t).toISOString();
+    }
+  }
   if (patch.password) {
     if (String(patch.password).length < 6) throw new Error("密码至少 6 位");
     user.salt = crypto.randomBytes(16).toString("hex");
