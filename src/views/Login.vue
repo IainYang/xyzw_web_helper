@@ -528,13 +528,36 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 640px) {
+/* ===== 移动端适配 ===== */
+@media (max-width: 1024px) {
+  /* 平板竖屏起就把介绍区收起，避免登录框被挤到屏幕外 */
+  .features-showcase {
+    display: none;
+  }
+
   .login-container {
-    padding: var(--spacing-md);
+    align-items: center;
+    justify-items: stretch;
+    min-height: calc(100dvh - 32px);
+  }
+}
+
+@media (max-width: 640px) {
+  .login-page {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: max(8vh, env(safe-area-inset-top));
+  }
+
+  .login-container {
+    padding: 0;
+    max-width: 100%;
+    min-height: auto;
   }
 
   .login-card {
-    padding: var(--spacing-xl);
+    padding: 24px 20px;
+    border-radius: 16px;
   }
 
   .brand-title {
@@ -545,13 +568,29 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .feature-item {
-    flex-direction: column;
-    text-align: center;
-  }
-
   .decoration-circle {
     display: none;
+  }
+
+  /* iOS 对小于 16px 的输入框会自动放大页面，这里锁住 */
+  :deep(.n-input .n-input__input-el),
+  :deep(.n-input .n-input__placeholder) {
+    font-size: 16px;
+  }
+
+  /* 触控目标不小于 44px */
+  :deep(.n-button--large-type) {
+    height: 46px;
+  }
+}
+
+@media (max-width: 380px) {
+  .login-card {
+    padding: 20px 16px;
+  }
+
+  .brand-title {
+    font-size: var(--font-size-lg);
   }
 }
 </style>
