@@ -331,6 +331,11 @@ export function registerDefaultCommands(reg) {
     // 升星相关
     .register("hero_heroupgradestar")
     .register("book_upgrade")
+    .register("book_batchupgrade", {
+      club: 0,
+      isArtifact: false,
+      isSkin: false,
+    })
     .register("book_claimpointreward")
 
     // 排名相关
@@ -338,6 +343,10 @@ export function registerDefaultCommands(reg) {
 
     // 梦魇相关
     .register("nightmare_getroleinfo")
+    // 十殿周奖励：领铃铛 / roll 转盘 / 领取额外次数
+    .register("nightmare_claimweekreward")
+    .register("nightmare_clickturntable")
+    .register("nightmare_claimturnrewardtimes")
     .register("dungeon_selecthero")
     .register("bosstower_gethelprank")
     .register("dungeon_buymerchant")
@@ -1321,6 +1330,10 @@ export class XyzwWebSocketClient {
       legion_getarearankresp: "legion_getarearank",
       legionwar_getgoldmonthwarrankresp: "legionwar_getgoldmonthwarrank",
       nightmare_getroleinforesp: "nightmare_getroleinfo",
+      nightmare_claimweekrewardresp: "nightmare_claimweekreward",
+      nightmare_clickturntableresp: "nightmare_clickturntable",
+      // 领额外次数的回执复用 clickturntableresp
+      nightmare_claimturnrewardtimesresp: "nightmare_claimturnrewardtimes",
       fight_startlevelresp: "fight_startlevel",
       fight_calcleveltimeresp: "fight_calcleveltime",
       fight_levelresp: "fight_level",
@@ -1419,6 +1432,7 @@ export class XyzwWebSocketClient {
       hero_heroupgradelevelresp: "hero_heroupgradelevel",
       hero_heroupgradeorderresp: "hero_heroupgradeorder",
       book_upgraderesp: "book_upgrade",
+      book_batchupgraderesp: "book_batchupgrade",
       book_claimpointrewardresp: "book_claimpointreward",
       // 军团信息
       legion_getinforesp: "legion_getinfo",
