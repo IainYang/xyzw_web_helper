@@ -6780,6 +6780,67 @@ const stopBatch = () => {
     gap: 4px;
   }
 
+  /* 页头里的内联 flex 挡住了换行，窄屏下标题会被挤成竖排，这里强制纵向 */
+  .page-header > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    width: 100%;
+    gap: 8px !important;
+  }
+
+  .page-header h2 {
+    font-size: 18px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  /* 定时任务信息条：允许换行 */
+  .page-header > div:first-child > div {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* 执行按钮组：换行，别溢出右侧 */
+  .page-header > div:nth-child(2) {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 8px !important;
+  }
+
+  .page-header > div:nth-child(2) :deep(.n-button) {
+    flex: 1 1 auto;
+  }
+
+  /* 批量功能的按钮组：n-space 默认 nowrap，窄屏会挤成一坨 */
+  :deep(.n-tab-pane .n-space) {
+    flex-wrap: wrap !important;
+    width: 100%;
+  }
+
+  /* 功能页签（日常/副本/宝库/怪异塔/资源/月度）可左右滑动，别被裁掉 */
+  :deep(.n-tabs-nav-scroll-content) {
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+
+  :deep(.n-tabs-nav-scroll-content)::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 账号列表压成单列，账号名不再折成两行 */
+  .token-list-card :deep(.n-grid) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 定时任务那一排按钮（新增/查看/导出/导入）横向排不下会溢出，允许换行 */
+  .page-header > div:first-child > div > div:last-child {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 8px !important;
+  }
+
   /* 批量功法残卷赠送样式 */
   .recipient-info:hover {
     transform: translateY(-2px);
