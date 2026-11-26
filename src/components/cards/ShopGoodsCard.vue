@@ -1818,4 +1818,21 @@ async function runPurchase() {
     color: var(--error-color);
   }
 }
+
+/* ===== 移动端：4 个按钮横排会超出卡片（132+104*3+gap≈492），改为两列 ===== */
+@media (max-width: 768px) {
+  .shop-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+
+    .read-btn,
+    .refresh-btn,
+    .plan-btn,
+    .run-btn {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 0;
+    }
+  }
+}
 </style>

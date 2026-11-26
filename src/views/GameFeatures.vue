@@ -648,4 +648,40 @@ onUnmounted(() => {
     gap: var(--spacing-sm);
   }
 }
+
+/* ===== 窄屏（<520px）收紧 ===== */
+@media (max-width: 520px) {
+  .container {
+    padding: 0 10px;
+  }
+
+  .page-header {
+    padding: 12px 0;
+    margin-bottom: 10px;
+  }
+
+  .page-title {
+    font-size: var(--font-size-lg);
+  }
+
+  .page-subtitle {
+    font-size: 12px;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .connection-status {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .enter-game-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
 </style>

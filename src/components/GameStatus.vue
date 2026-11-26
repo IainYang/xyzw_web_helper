@@ -894,12 +894,21 @@ onUnmounted(() => {
 // 响应式设计
 @media (max-width: 768px) {
   .game-status-container {
-    grid-template-columns: 1fr;
+    /* 1fr 的 auto 下限会被内容的最小宽度顶开（身份牌 494px），
+       导致窄屏整页横向溢出，这里必须用 minmax(0, 1fr) */
+    grid-template-columns: minmax(0, 1fr);
     padding: var(--spacing-sm);
+  }
+
+  /* 栅格子项也不许被内容撑宽 */
+  .game-status-container > * {
+    min-width: 0;
   }
 
   .status-card {
     padding: var(--spacing-md);
+    min-width: 0;
+    overflow-x: hidden;
   }
 
   .card-header {
@@ -914,6 +923,35 @@ onUnmounted(() => {
     .status-badge {
       margin-left: auto;
     }
+  }
+}
+
+/* ===== 窄屏（<520px）：10 个页签放不下，压紧并允许滑动 ===== */
+@media (max-width: 520px) {
+  .section-tabs {
+    margin: 0 4px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .section-tabs :deep(.n-tabs-tab) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  .section-tabs :deep(.n-tabs-tab-pad) {
+    width: 8px;
+  }
+
+  /* naive 的左右滚动按钮在触屏上没用，占位反而挤压标签 */
+  .section-tabs :deep(.n-tabs-nav-scroll-button) {
+    display: none;
   }
 }
 </style>

@@ -425,6 +425,9 @@ watch(
   gap: 6px;
   height: 32px;
   padding: 0 12px;
+  /* 卡片被压窄时「刷新」会被拆成两行 */
+  flex-shrink: 0;
+  white-space: nowrap;
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
   background: var(--bg-primary, #ffffff);

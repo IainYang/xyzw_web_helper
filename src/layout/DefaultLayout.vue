@@ -488,6 +488,10 @@ const handleUserAction = async (key) => {
 .username {
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+  /* 账号名过长时省略，别把顶栏挤开 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -514,6 +518,44 @@ const handleUserAction = async (key) => {
 
   .brand-toggle {
     display: inline-flex;
+    /* 「XYZW 控制台」在窄屏会被压成两行 */
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nav-user {
+    gap: var(--spacing-sm);
+    min-width: 0;
+  }
+
+  .user-info {
+    min-width: 0;
+    max-width: 42vw;
+  }
+}
+
+@media (max-width: 520px) {
+  .nav-container {
+    padding: 0 8px;
+  }
+
+  .brand-toggle {
+    gap: 2px;
+    font-size: var(--font-size-base);
+  }
+
+  .brand-text {
+    font-size: 13px;
+  }
+
+  .nav-user {
+    gap: 6px;
+  }
+
+  .user-info {
+    padding: 4px 6px;
+    gap: 4px;
+    max-width: 46vw;
   }
 }
 

@@ -938,4 +938,27 @@ onBeforeUnmount(() => {
     margin-top: var(--spacing-sm);
   }
 }
+
+@media (max-width: 520px) {
+  /* 768 下 header-right 被拉成整行，标题下方空一大块；
+     窄屏标题和「任务详情」其实放得下，回到同一行更紧凑 */
+  .card-header {
+    gap: 8px;
+    align-items: center;
+  }
+
+  .header-right {
+    width: auto;
+    margin-top: 0;
+    margin-left: auto;
+    justify-content: flex-end;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .settings-gear {
+    width: 26px;
+    height: 26px;
+  }
+}
 </style>

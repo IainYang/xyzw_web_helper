@@ -1343,6 +1343,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* 父级 card-content 是 align-items:center，行会被压缩成内容宽度，
+     space-between 失效（层数和「当前层数」挤在一起），这里撑满并留间距 */
+  flex: 1;
+  gap: 8px;
 
   .label {
     font-size: var(--font-size-sm);
@@ -1447,6 +1451,22 @@ onMounted(() => {
 
   .energy-display {
     align-self: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .card-header {
+    margin-bottom: 10px;
+  }
+
+  .card-content {
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .energy-display {
+    align-self: stretch;
+    justify-content: center;
   }
 }
 </style>
