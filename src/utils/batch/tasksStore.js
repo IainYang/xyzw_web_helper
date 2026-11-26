@@ -4,6 +4,8 @@
  * store_syncpurchaseconfig, collection_claimfreereward
  */
 
+import { getGoodsFinalPrice, getGoodsName } from "../shopGoodsPrice";
+import { loadShopPlan, planGoodsIds } from "../shopPlan";
 import {
   compareBlackMarketPurchaseLists,
   normalizeBlackMarketPurchaseList,
@@ -469,6 +471,13 @@ export function createTasksStore(deps) {
   /**
    * 黑市一键采购
    */
+  /**
+   * 黑市一键采购：按账号已保存的「购买计划」执行。
+   *
+   * 计划在「个人日常」页的黑市商品卡片里配置（勾选商品 + 心理价）。
+   * 没有计划的账号直接跳过并提示去处；现价高于心理价的商品不买。
+   * 日志只留一行：买了几个、分别是什么、哪些因超价没买。
+   */
   const store_purchase = async () => {
     if (selectedTokens.value.length === 0) return;
 
@@ -484,61 +493,99 @@ export function createTasksStore(deps) {
 
       tokenStatus.value[tokenId] = "running";
       const token = tokens.value.find((t) => t.id === tokenId);
+      const nameOf = (goodsId) => getGoodsName(goodsId) || `${goodsId} 号`;
 
       try {
-        addLog({
-          time: new Date().toLocaleTimeString(),
-          message: `=== 开始黑市一键采购: ${token.name} ===`,
-          type: "info",
-        });
-
         await ensureConnection(tokenId);
 
-        addLog({
-          time: new Date().toLocaleTimeString(),
-          message: `${token.name} 发送黑市采购请求...`,
-          type: "info",
-        });
-
-        const result = await tokenStore.sendMessageWithPromise(
-          tokenId,
-          "store_purchase",
-          {},
-          5000,
-        );
-
-        await sleep(delayConfig.action);
-
-        if (result.error) {
+        const plan = loadShopPlan(tokenId);
+        const planIds = planGoodsIds(plan);
+        if (!planIds.length) {
           addLog({
             time: new Date().toLocaleTimeString(),
-            message: `${token.name} 黑市采购失败: ${result.error}`,
-            type: "error",
-          });
-          tokenStatus.value[tokenId] = "failed";
-        } else {
-          addLog({
-            time: new Date().toLocaleTimeString(),
-            message: `${token.name} 黑市采购成功`,
-            type: "success",
+            message: `${token.name}：没有黑市购买计划，请先到「个人日常」页创建计划`,
+            type: "warning",
           });
           tokenStatus.value[tokenId] = "completed";
+          return;
         }
+
+        const res = await tokenStore.sendMessageWithPromise(
+          tokenId,
+          "store_goodslist",
+          { storeId: 1 },
+          15000,
+        );
+        const goods = res?.goodsList ?? {};
+        const rows = Object.entries(goods).map(([id, value]) => ({
+          goodsId: Number(id),
+          ...(value || {}),
+        }));
+
+        const bought = [];
+        const tooExpensive = [];
+        const missing = [];
+
+        for (const goodsId of planIds) {
+          if (shouldStop.value) break;
+          const row = rows.find((r) => Number(r.goodsId) === Number(goodsId));
+          if (!row) {
+            missing.push(nameOf(goodsId));
+            continue;
+          }
+          const limit = Number(plan.items[String(goodsId)]) || 0;
+          const price = getGoodsFinalPrice(goodsId, row.discount);
+          if (price == null || price > limit) {
+            tooExpensive.push(`${nameOf(goodsId)}(${price ?? "?"} > ${limit})`);
+            continue;
+          }
+          try {
+            await tokenStore.sendMessageWithPromise(
+              tokenId,
+              "store_buy",
+              { goodsId },
+              8000,
+            );
+            bought.push(`${nameOf(goodsId)} ${price}`);
+            await sleep(delayConfig.action);
+          } catch (error) {
+            tooExpensive.push(
+              `${nameOf(goodsId)}(购买失败: ${error?.message ?? "未知"})`,
+            );
+          }
+        }
+
+        const parts = [];
+        parts.push(
+          bought.length
+            ? `买了 ${bought.length} 个：${bought.join("、")}`
+            : "没有可买的商品",
+        );
+        if (tooExpensive.length) {
+          parts.push(
+            `${tooExpensive.length} 个超出计划金额未买：${tooExpensive.join("、")}`,
+          );
+        }
+        if (missing.length) {
+          parts.push(`本批没有 ${missing.length} 个：${missing.join("、")}`);
+        }
+
+        addLog({
+          time: new Date().toLocaleTimeString(),
+          message: `${token.name}：${parts.join("；")}`,
+          type: bought.length ? "success" : "info",
+        });
+        tokenStatus.value[tokenId] = "completed";
       } catch (error) {
         addLog({
           time: new Date().toLocaleTimeString(),
-          message: `${token.name} 黑市采购过程出错: ${error.message}`,
+          message: `${token.name} 黑市采购出错：${error.message}`,
           type: "error",
         });
         tokenStatus.value[tokenId] = "failed";
       } finally {
         tokenStore.closeWebSocketConnection(tokenId);
         releaseConnectionSlot();
-        addLog({
-          time: new Date().toLocaleTimeString(),
-          message: `${token.name} 连接已关闭 (队列: ${connectionQueue.active}/${batchSettings.maxActive})`,
-          type: "info",
-        });
       }
     });
 
