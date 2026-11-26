@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h2>用户管理</h2>
-        <p>白名单控制：只有这里列出的账号才能登录系统</p>
+        <p style="color:white">白名单控制：只有这里列出的账号才能登录系统</p>
       </div>
       <div class="head-actions">
         <NButton type="primary" @click="openCreate">新增用户</NButton>
@@ -12,7 +12,41 @@
     </div>
 
     <n-card title="白名单用户" size="small" class="card-block">
+      <!-- 移动端：卡片列表（7 列在窄屏怎么压都放不下） -->
+      <div v-if="isMobile" class="user-cards">
+        <div v-for="u in users" :key="u.username" class="user-card">
+          <div class="uc-head">
+            <span class="uc-name">{{ u.username }}</span>
+            <NTag
+              size="small"
+              :type="u.role === 'admin' ? 'warning' : 'default'"
+            >
+              {{ u.role === "admin" ? "管理员" : "普通" }}
+            </NTag>
+            <NTag size="small" :type="u.enabled ? 'success' : 'error'">
+              {{ u.enabled ? "启用" : "停用" }}
+            </NTag>
+          </div>
+          <div class="uc-meta">
+            <span v-if="u.note" class="uc-note">{{ u.note }}</span>
+            <span>{{ u.lastLoginAt ? formatTime(u.lastLoginAt) : "从未登录" }}</span>
+            <span v-if="u.lastLoginIp">{{ u.lastLoginIp }}</span>
+          </div>
+          <div class="uc-actions">
+            <NButton size="tiny" @click="toggleEnabled(u)">
+              {{ u.enabled ? "停用" : "启用" }}
+            </NButton>
+            <NButton size="tiny" @click="openEdit(u)">改密</NButton>
+            <NButton size="tiny" type="error" @click="removeUser(u)">
+              删除
+            </NButton>
+          </div>
+        </div>
+        <div v-if="!users.length && !loading" class="uc-empty">暂无用户</div>
+      </div>
+
       <n-data-table
+        v-else
         :columns="columns"
         :data="users"
         :loading="loading"
@@ -46,6 +80,7 @@
         size="small"
         :pagination="{ pageSize: 20 }"
         max-height="420"
+        :scroll-x="760"
       />
     </n-card>
 
@@ -54,7 +89,7 @@
       v-model:show="modalVisible"
       preset="card"
       :title="editing ? `编辑 ${editing.username}` : '新增用户'"
-      style="width: 460px"
+      style="width: min(460px, calc(100vw - 24px))"
     >
       <n-form label-placement="top">
         <n-form-item label="用户名">
@@ -98,10 +133,15 @@
 
 <script setup>
 import { NButton, NTag, useDialog, useMessage } from "naive-ui";
-import { computed, h, onMounted, reactive, ref } from "vue";
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
+/** 窄屏用卡片代替表格 */
+const isMobile = ref(false);
+const updateIsMobile = () => {
+  isMobile.value = window.innerWidth <= 768;
+};
 const message = useMessage();
 const dialog = useDialog();
 
@@ -151,7 +191,7 @@ const columns = [
         { default: () => (row.enabled ? "启用" : "停用") },
       ),
   },
-  { title: "备注", key: "note", ellipsis: { tooltip: true } },
+  { title: "备注", key: "note", width: 200, ellipsis: { tooltip: true } },
   {
     title: "最后登录",
     key: "lastLoginAt",
@@ -215,7 +255,7 @@ const logColumns = [
         { default: () => (row.ok ? "成功" : "失败") },
       ),
   },
-  { title: "说明", key: "reason", ellipsis: { tooltip: true } },
+  { title: "说明", key: "reason", width: 220, ellipsis: { tooltip: true } },
   { title: "IP", key: "ip", width: 150 },
 ];
 
@@ -376,8 +416,13 @@ function removeUser(row) {
   });
 }
 
+updateIsMobile();
 onMounted(async () => {
+  window.addEventListener("resize", updateIsMobile);
   await Promise.all([loadUsers(), loadLogs()]);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateIsMobile);
 });
 </script>
 
@@ -433,5 +478,141 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+/* ===== 移动端 ===== */
+@media (max-width: 768px) {
+  .user-manage-view {
+    padding: 12px;
+  }
+
+  .page-head {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .page-head h2 {
+    font-size: 18px;
+  }
+
+  .page-head p {
+    /* 中文在窄容器里会被逐字换行，这里控制字号并允许正常断行 */
+    font-size: 12px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .head-actions {
+    width: 100%;
+  }
+
+  .head-actions :deep(.n-button) {
+    flex: 1;
+  }
+
+  /* 卡片内边距收窄，给表格多留点宽度 */
+  .card-block :deep(.n-card__content) {
+    padding: 10px;
+  }
+
+  .card-block :deep(.n-card-header) {
+    padding: 10px 12px 0;
+  }
+
+  .log-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .log-head :deep(.n-select) {
+    width: 100% !important;
+  }
+
+  .log-hint {
+    /* 路径太长，手机上会竖着断行，直接隐藏 */
+    display: none;
+  }
+
+  /* 表格字号略小，横向滚动时不至于一屏只看到一列 */
+  :deep(.n-data-table) {
+    font-size: 12px;
+  }
+
+  :deep(.n-data-table .n-data-table-th),
+  :deep(.n-data-table .n-data-table-td) {
+    padding: 8px 6px;
+  }
+
+  /* 移动端用户卡片 */
+  .user-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .user-card {
+    border: 1px solid var(--border-light, #e5e7eb);
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .uc-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .uc-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1f2937;
+    word-break: break-all;
+  }
+
+  .uc-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+
+  .uc-note {
+    color: #374151;
+  }
+
+  .uc-actions {
+    display: flex;
+    gap: 8px;
+
+    :deep(.n-button) {
+      flex: 1;
+    }
+  }
+
+  .uc-empty {
+    padding: 24px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+  }
+
+  /* 日志表窄屏：保留「时间 / 动作 / 结果」，隐藏用户名、说明、IP */
+  .card-block:last-of-type :deep(.n-data-table-th:nth-child(3)),
+  .card-block:last-of-type :deep(.n-data-table-td:nth-child(3)),
+  .card-block:last-of-type :deep(.n-data-table-th:nth-child(5)),
+  .card-block:last-of-type :deep(.n-data-table-td:nth-child(5)),
+  .card-block:last-of-type :deep(.n-data-table-th:nth-child(6)),
+  .card-block:last-of-type :deep(.n-data-table-td:nth-child(6)) {
+    display: none;
+  }
+
+  /* 表格（桌面视图）在窄屏的兜底裁剪 */
+
 }
 </style>
