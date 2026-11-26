@@ -518,9 +518,10 @@ export function createTasksStore(deps) {
 
         const maxRefresh = Math.max(0, Number(plan.maxRefresh) || 0);
         const bought = [];
-        const tooExpensive = [];
+        // 多轮刷新时同一件商品可能反复被判超价，按 goodsId 去重，只留最后一次的价格
+        const tooExpensive = new Map();
+        const failed = new Map();
         const missing = new Set();
-        const failed = [];
         let refreshUsed = 0;
         let goldShortAt = null;
 
@@ -561,7 +562,7 @@ export function createTasksStore(deps) {
               continue;
             }
             if (price > limit) {
-              tooExpensive.push(`${nameOf(goodsId)}(${price} > ${limit})`);
+              tooExpensive.set(goodsId, `${nameOf(goodsId)}(${price} > ${limit})`);
               continue;
             }
             // 金砖前置判断：不够就停手，别等服务端报错
@@ -583,7 +584,7 @@ export function createTasksStore(deps) {
               await sleep(delayConfig.action);
               await tokenStore.sendGetRoleInfo(tokenId).catch(() => null);
             } catch (error) {
-              failed.push(`${nameOf(goodsId)}(${error?.message ?? "失败"})`);
+              failed.set(goodsId, `${nameOf(goodsId)}(${error?.message ?? "失败"})`);
             }
           }
           return boughtThisRound;
@@ -624,13 +625,13 @@ export function createTasksStore(deps) {
         if (goldShortAt !== null) {
           parts.push(`金砖不足（剩 ${goldShortAt}），已停止购买`);
         }
-        if (tooExpensive.length) {
+        if (tooExpensive.size) {
           parts.push(
-            `${tooExpensive.length} 个超出计划金额未买：${tooExpensive.join("、")}`,
+            `${tooExpensive.size} 个超出计划金额未买：${[...tooExpensive.values()].join("、")}`,
           );
         }
-        if (failed.length) {
-          parts.push(`${failed.length} 个购买失败：${failed.join("、")}`);
+        if (failed.size) {
+          parts.push(`${failed.size} 个购买失败：${[...failed.values()].join("、")}`);
         }
         if (missing.size) {
           parts.push(`本批没有：${[...missing].join("、")}`);
