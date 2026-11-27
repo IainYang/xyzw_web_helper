@@ -1,3 +1,6 @@
+/* eslint-disable perfectionist/sort-imports -- ./lib/env.js 必须先执行（先加载 .env），顺序不能交给自动排序 */
+// 先加载 .env：后面那些在模块顶层读 process.env 的文件（authStore / authToken / syncStore）才拿得到值
+import "./lib/env.js";
 import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
@@ -8,7 +11,6 @@ import cors from "cors";
 /**
  * XYZW 游戏自动化后端 - Express + Supabase + Render
  */
-import dotenv from "dotenv";
 import express from "express";
 import cron from "node-cron";
 import { createApiKeyMiddleware } from "./lib/apiKeyAuth.js";
@@ -34,8 +36,6 @@ import {
   redeemSyncCode,
   SyncError,
 } from "./lib/syncStore.js";
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
